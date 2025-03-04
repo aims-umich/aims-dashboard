@@ -2,31 +2,18 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FiMoon, FiSun } from 'react-icons/fi';
 
-const sentimentOverTime = Array.from({ length: 12 }, (_, i) => ({
-  month: `Month ${i + 1}`,
-  positive: Math.floor(Math.random() * 100),
-  neutral: Math.floor(Math.random() * 100),
-  negative: Math.floor(Math.random() * 100),
-}));
-
-const sentimentDistribution = [
-  { name: 'Positive', value: 45 },
-  { name: 'Neutral', value: 35 },
-  { name: 'Negative', value: 20 },
-];
-
-const recentPosts = Array.from({ length: 5 }, (_, i) => ({
-  id: `post${i + 1}`,
-  content: `Sample post content ${i + 1}`,
-  sentiment: ['Positive', 'Neutral', 'Negative'][Math.floor(Math.random() * 3)],
-  date: new Date(Date.now() - i * 86400000).toLocaleDateString(),
-  likes: Math.floor(Math.random() * 1000),
-  reposts: Math.floor(Math.random() * 500),
-  comments: Math.floor(Math.random() * 200),
-}));
-
 function App() {
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem('darkMode');
+    return savedMode ? JSON.parse(savedMode) : true;
+  });
+
+  const [sentimentData, setSentimentData] = useState({
+    sentimentOverTime: [],
+    sentimentDistribution: [],
+    recentPosts: [],
+    totalPosts: 0,
+  });
 
   useEffect(() => {
     if (darkMode) {
@@ -34,7 +21,68 @@ function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
+
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/posts')
+      .then(response => response.json())
+      .then(data => {
+        const results = data.results;
+
+        const totalPosts = results.length;
+
+        const sentimentOverTime = [];
+        const chunkSize = Math.ceil(results.length / 12);
+        for (let i = 0; i < 12 && i * chunkSize < results.length; i++) {
+          const chunk = results.slice(i * chunkSize, (i + 1) * chunkSize);
+          const counts = chunk.reduce(
+            (acc, item) => {
+              acc[item.predicted_label] = (acc[item.predicted_label] || 0) + 1;
+              return acc;
+            },
+            { positive: 0, neutral: 0, negative: 0 }
+          );
+          sentimentOverTime.push({
+            month: `Month ${i + 1}`,
+            positive: counts.positive,
+            neutral: counts.neutral,
+            negative: counts.negative,
+          });
+        }
+
+        const distributionCounts = results.reduce(
+          (acc, item) => {
+            acc[item.predicted_label] = (acc[item.predicted_label] || 0) + 1;
+            return acc;
+          },
+          { positive: 0, neutral: 0, negative: 0 }
+        );
+        const sentimentDistribution = [
+          { name: 'Positive', value: distributionCounts.positive },
+          { name: 'Neutral', value: distributionCounts.neutral },
+          { name: 'Negative', value: distributionCounts.negative },
+        ];
+
+        const recentPosts = results.slice(-5).map((item, index) => ({
+          id: `post${index + 1}`,
+          content: item.text,
+          sentiment: item.predicted_label.charAt(0).toUpperCase() + item.predicted_label.slice(1),
+          date: new Date(Date.now() - index * 86400000).toLocaleDateString(),
+          likes: Math.floor(Math.random() * 1000),
+          reposts: Math.floor(Math.random() * 500),
+          comments: Math.floor(Math.random() * 200),
+        }));
+
+        setSentimentData({
+          sentimentOverTime,
+          sentimentDistribution,
+          recentPosts,
+          totalPosts,
+        });
+      })
+      .catch(error => console.error('Error fetching data:', error));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
@@ -48,6 +96,7 @@ function App() {
             <button
               onClick={() => setDarkMode(!darkMode)}
               className="p-2 rounded-lg bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-white"
+              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             >
               {darkMode ? <FiSun className="w-5 h-5" /> : <FiMoon className="w-5 h-5" />}
             </button>
@@ -58,9 +107,9 @@ function App() {
       <main className="p-4">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard title="Total Posts" value="12,361" change="+14%" />
-            <MetricCard title="Total Keywords" value="431,225" change="+21%" />
-            <MetricCard title="Time Range" value="30 Days" change="Active" />
+            <MetricCard title="Total Posts" value={sentimentData.totalPosts.toLocaleString()} change="+14%" />
+            <MetricCard title="Total Keywords" value="84" />
+            <MetricCard title="Time Range" value="30 Days" />
             <MetricCard title="Percent Verified" value="78.5%" change="+43%" />
           </div>
 
@@ -68,7 +117,7 @@ function App() {
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Sentiment Trends</h2>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={sentimentOverTime}>
+                <LineChart data={sentimentData.sentimentOverTime}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -84,7 +133,7 @@ function App() {
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Sentiment Distribution</h2>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sentimentDistribution}>
+                <BarChart data={sentimentData.sentimentDistribution}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
@@ -110,7 +159,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {recentPosts.map((post) => (
+                  {sentimentData.recentPosts.map((post) => (
                     <tr key={post.id}>
                       <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{post.content}</td>
                       <td className="px-4 py-3 text-sm">
@@ -143,7 +192,7 @@ function MetricCard({ title, value, change }) {
       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</h3>
       <div className="mt-2 flex items-baseline">
         <p className="text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
-        <span className="ml-2 text-sm font-medium text-green-600 dark:text-green-400">{change}</span>
+        {change && <span className="ml-2 text-sm font-medium text-green-600 dark:text-green-400">{change}</span>}
       </div>
     </div>
   );

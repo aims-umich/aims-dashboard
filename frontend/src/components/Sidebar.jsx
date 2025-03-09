@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SidebarImpl, SidebarBody, SidebarLink } from './ui/SidebarImpl';
-import { BookOpen, NewspaperIcon } from "lucide-react";
+import { BookOpen, NewspaperIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { classNames } from '../lib/utils';
 import { SocialIcon } from 'react-social-icons';
@@ -57,7 +57,7 @@ export function Sidebar({ children }) {
   return (
     <div
       className={classNames(
-        'flex flex-col md:flex-row bg-gray-50 dark:bg-gray-900 w-full flex-1 h-screen'
+        'flex flex-col md:flex-row bg-gray-50 dark:bg-gray-900 w-full h-screen overflow-hidden'
       )}
     >
       <SidebarImpl open={open} setOpen={setOpen}>
@@ -89,7 +89,10 @@ export function Sidebar({ children }) {
           </div>
         </SidebarBody>
       </SidebarImpl>
-      <div className={classNames('flex-1 ml-16', open ? 'md:ml-64' : 'md:ml-16')}>
+      <div className={classNames(
+        'flex-1 overflow-y-auto transition-all duration-300',
+        open ? 'md:ml-[300px]' : 'md:ml-16'
+      )}>
         {children}
       </div>
     </div>

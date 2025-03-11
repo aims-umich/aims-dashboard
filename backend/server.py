@@ -1,19 +1,43 @@
 import warnings
+import sqlite3
 import numpy as np
 import pandas as pd
 import torch
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from fastapi.middleware.cors import CORSMiddleware
 
-# --- Step 1: Create FastAPI application and load data ---
+warnings.filterwarnings("ignore")
+
+# --- Step 1: Create FastAPI application ---
 app = FastAPI()
-train = pd.read_csv('train.csv')
-test = pd.read_csv('test.csv')
-train['label'] = train.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
-test['label'] = test.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
-# --- Step 2: Load BERT checkpoint ---
+# --- Step 2: Set up SQLite database ---
+def init_db():
+    conn = sqlite3.connect("posts.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            true_label TEXT NOT NULL,
+            predicted_label TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# --- Step 3: Load BERT checkpoint and model ---
 checkpoint = 'kumo24/bert-sentiment-nuclear'
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
@@ -35,9 +59,9 @@ model = AutoModelForSequenceClassification.from_pretrained(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
-# --- Step 3: Function to classify text ---
+# --- Step 4: Function to classify text ---
 def classify_text(text):
-    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
     inputs = {key: value.to(device) for key, value in inputs.items()}
 
     with torch.no_grad():
@@ -46,58 +70,77 @@ def classify_text(text):
 
     return id2label[predicted_class]
 
-# --- Step 4: FastAPI routes ---
+# --- Step 5: Populate database with sentiment analysis results (run once) ---
+def populate_db():
+    conn = sqlite3.connect("posts.db")
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM posts")
+    count = c.fetchone()[0]
+    conn.close()
+
+    if count > 0:
+        print("Database already populated. Skipping sentiment analysis.")
+        return
+
+    print("Populating database with sentiment analysis results...")
+    train = pd.read_csv('./threads/training_threads.csv', quotechar='"')
+    test = pd.read_csv('./threads/testing_threads.csv', quotechar='"')
+
+    train['label'] = train.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
+    test['label'] = test.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
+
+    all_data = pd.concat([train, test], ignore_index=True)
+
+    results = []
+    for idx, row in all_data.iterrows():
+        text = row['text']
+        if pd.isna(text) or text is None:
+            text = ''
+        else:
+            text = str(text).strip()
+
+        if not text:
+            continue
+
+        true_label = id2label[row['label']]
+
+        try:
+            predicted_label = classify_text(text)
+            results.append((text, true_label, predicted_label))
+        except Exception as e:
+            print(f"Error processing row {idx} with text '{text}': {str(e)}")
+            continue
+
+    conn = sqlite3.connect("posts.db")
+    c = conn.cursor()
+    c.executemany("INSERT INTO posts (text, true_label, predicted_label) VALUES (?, ?, ?)", results)
+    conn.commit()
+    conn.close()
+    print("Database populated successfully!")
+
+populate_db()
+
+# --- Step 6: FastAPI routes ---
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     html_content = """
     <html>
-    <head><title>Sentiment Classification</title></head>
+    <head><title>Sentiment Classification API</title></head>
     <body>
         <h1>Sentiment Classification API</h1>
-        <p>Go to <a href='/classify-test/'>Classify Test Data</a> to view results.</p>
+        <p>Go to <a href='/posts/'>Posts</a> for all posts (JSON).</p>
     </body>
     </html>
     """
     return HTMLResponse(content=html_content)
 
-@app.get("/classify-test/", response_class=HTMLResponse)
-def classify_test_data():
-    results = []
-
-    for _, row in test.iterrows():
-        text = row['text']
-        true_label = id2label[row['label']]
-        predicted_label = classify_text(text)
-        results.append((text, true_label, predicted_label))
-
-    html_content = """
-    <html>
-    <head><title>Classification Results</title></head>
-    <body>
-        <h1>Sentiment Classification Results</h1>
-        <table border='1'>
-            <tr>
-                <th>Text</th>
-                <th>True Label</th>
-                <th>Predicted Label</th>
-            </tr>
-    """
-
-    for text, true_label, predicted_label in results:
-        html_content += f"""
-        <tr>
-            <td>{text}</td>
-            <td>{true_label}</td>
-            <td>{predicted_label}</td>
-        </tr>
-        """
-
-    html_content += """
-        </table>
-    </body>
-    </html>
-    """
-
-    return HTMLResponse(content=html_content)
+@app.get("/posts/")
+def get_posts():
+    conn = sqlite3.connect("posts.db")
+    c = conn.cursor()
+    c.execute("SELECT text, true_label, predicted_label FROM posts")
+    results = [{"text": row[0], "true_label": row[1], "predicted_label": row[2]} for row in c.fetchall()]
+    conn.close()
+    return {"results": results}
 
 # Run the app with: uvicorn server:app --reload

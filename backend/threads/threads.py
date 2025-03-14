@@ -31,7 +31,10 @@ def init_db():
             text TEXT NOT NULL,
             true_label TEXT NOT NULL,
             predicted_label TEXT NOT NULL,
-            published_on TEXT NOT NULL
+            published_on TEXT NOT NULL,
+            comment_count INTEGER DEFAULT 0,
+            like_count INTEGER DEFAULT 0,
+            retweet_count INTEGER DEFAULT 0
         )
     """)
     conn.commit()
@@ -132,12 +135,18 @@ def populate_db():
         true_label = id2label[row['label']]
         predicted_label = classify_text(text)
         published_on = row['published_on']
+        comment_count = int(row['comment_count']) if pd.notna(row['comment_count']) else 0
+        like_count = int(row['like_count']) if pd.notna(row['like_count']) else 0
+        retweet_count = int(row['retweet_count']) if pd.notna(row['retweet_count']) else 0
 
-        results.append((text, true_label, predicted_label, published_on))
+        results.append((text, true_label, predicted_label, published_on, comment_count, like_count, retweet_count))
 
     conn = sqlite3.connect("threads.db")
     c = conn.cursor()
-    c.executemany("INSERT INTO posts (text, true_label, predicted_label, published_on) VALUES (?, ?, ?, ?)", results)
+    c.executemany(
+        "INSERT INTO posts (text, true_label, predicted_label, published_on, comment_count, like_count, retweet_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        results
+    )
     conn.commit()
     conn.close()
     print("database populated successfully!")
@@ -165,8 +174,18 @@ def get_posts():
 
     conn = sqlite3.connect("threads.db")
     c = conn.cursor()
-    c.execute("SELECT text, true_label, predicted_label, published_on FROM posts")
-    results = [{"text": row[0], "true_label": row[1], "predicted_label": row[2], "published_on": row[3]} for row in c.fetchall()]
+    c.execute("SELECT text, true_label, predicted_label, published_on, comment_count, like_count, retweet_count FROM posts ORDER BY published_on ASC")
+    results = [
+        {
+            "text": row[0],
+            "true_label": row[1],
+            "predicted_label": row[2],
+            "published_on": row[3],
+            "comment_count": row[4],
+            "like_count": row[5],
+            "retweet_count": row[6]
+        } for row in c.fetchall()
+    ]
     conn.close()
     
     averages = calculate_averages(all_data)

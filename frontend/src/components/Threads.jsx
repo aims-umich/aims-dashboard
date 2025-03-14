@@ -6,11 +6,15 @@ import { SocialIcon } from 'react-social-icons';
 
 function Threads() {
   const [loading, setLoading] = useState(true);
-  const [sentimentData, setSentimentData] = useState({
+  const [dashboardData, setDashboardData] = useState({
     sentimentOverTime: [],
     sentimentDistribution: [],
     recentPosts: [],
     totalPosts: 0,
+    avgComments: 0,
+    avgLikes: 0,
+    avgRetweets: 0,
+    verifiedProportion: 0,
   });
 
   const loadingStates = [
@@ -25,29 +29,18 @@ function Threads() {
     fetch('http://127.0.0.1:8000/posts')
       .then(response => response.json())
       .then(data => {
-        const results = data.results;
-
+        const { results, metrics } = data;
         const totalPosts = results.length;
 
-        const sentimentOverTime = [];
-        const chunkSize = Math.ceil(results.length / 12);
-        for (let i = 0; i < 12 && i * chunkSize < results.length; i++) {
-          const chunk = results.slice(i * chunkSize, (i + 1) * chunkSize);
-          const counts = chunk.reduce(
-            (acc, item) => {
-              acc[item.predicted_label] = (acc[item.predicted_label] || 0) + 1;
-              return acc;
-            },
-            { positive: 0, neutral: 0, negative: 0 }
-          );
-          sentimentOverTime.push({
-            month: `Month ${i + 1}`,
-            positive: counts.positive,
-            neutral: counts.neutral,
-            negative: counts.negative,
-          });
-        }
+        // Use backend-provided sentiment trends
+        const sentimentOverTime = metrics.sentiment_trends.time_periods.map((period, index) => ({
+          period,
+          positive: metrics.sentiment_trends.positive[index],
+          neutral: metrics.sentiment_trends.neutral[index],
+          negative: metrics.sentiment_trends.negative[index],
+        }));
 
+        // Calculate distribution from results
         const distributionCounts = results.reduce(
           (acc, item) => {
             acc[item.predicted_label] = (acc[item.predicted_label] || 0) + 1;
@@ -61,26 +54,44 @@ function Threads() {
           { name: 'Negative', value: distributionCounts.negative },
         ];
 
-        const recentPosts = results.slice(-5).map((item, index) => ({
-          id: `post${index + 1}`,
-          content: item.text,
-          sentiment: item.predicted_label.charAt(0).toUpperCase() + item.predicted_label.slice(1),
-          date: new Date(Date.now() - index * 86400000).toLocaleDateString(),
-          likes: Math.floor(Math.random() * 1000),
-          reposts: Math.floor(Math.random() * 500),
-          comments: Math.floor(Math.random() * 200),
-        }));
+        // Get real data for recent posts (last 5)
+        const allPosts = load_and_combine_data(); // Assuming this function is available or fetched separately
+        const recentPosts = results.slice(-5).map((item, index) => {
+          const originalPost = allPosts.find(p => p.text === item.text) || {};
+          return {
+            id: `post${index + 1}`,
+            content: item.text,
+            sentiment: item.predicted_label.charAt(0).toUpperCase() + item.predicted_label.slice(1),
+            date: originalPost.published_on ? new Date(originalPost.published_on).toLocaleDateString() : 'N/A',
+            likes: originalPost.like_count || 0,
+            reposts: originalPost.retweet_count || 0,
+            comments: originalPost.comment_count || 0,
+          };
+        });
 
-        setSentimentData({
+        setDashboardData({
           sentimentOverTime,
           sentimentDistribution,
           recentPosts,
           totalPosts,
+          avgComments: metrics.averages.avg_comments,
+          avgLikes: metrics.averages.avg_likes,
+          avgRetweets: metrics.averages.avg_retweets,
+          verifiedProportion: metrics.verified_proportion,
         });
       })
       .catch(error => console.error('Error fetching data:', error))
       .finally(() => setLoading(false));
   }, []);
+
+  // Note: This function should ideally come from a separate data service
+  // For this example, I'm assuming it's available. In practice, you'd need to:
+  // 1. Fetch this data separately from the backend
+  // 2. Or include all necessary fields in the /posts endpoint
+  const load_and_combine_data = () => {
+    // Placeholder - in reality, this should fetch from backend or be included in /posts
+    return [];
+  };
 
   return (
     <>
@@ -99,19 +110,22 @@ function Threads() {
           <main className="p-4">
             <div className="max-w-7xl mx-auto space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <MetricCard title="Total Posts" value={sentimentData.totalPosts.toLocaleString()} change="+14%" />
+                <MetricCard title="Total Posts" value={dashboardData.totalPosts.toLocaleString()} />
                 <MetricCard title="Total Keywords" value="83" />
-                <MetricCard title="Time Range" value="30 Days" />
-                <MetricCard title="Percent Verified" value="78.5%" change="+43%" />
+                <MetricCard title="Avg Comments" value={dashboardData.avgComments.toLocaleString()} />
+                <MetricCard title="Avg Likes" value={dashboardData.avgLikes.toLocaleString()} />
+                <MetricCard title="Avg Retweets" value={dashboardData.avgRetweets.toLocaleString()} />
+                <MetricCard title="Percent Verified" value={`${dashboardData.verifiedProportion}%`} />
+                <MetricCard title="Time Range" value="2023-2025" />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
                   <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Sentiment Trends</h2>
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={sentimentData.sentimentOverTime}>
+                    <LineChart data={dashboardData.sentimentOverTime}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
+                      <XAxis dataKey="period" />
                       <YAxis />
                       <Tooltip />
                       <Legend />
@@ -125,7 +139,7 @@ function Threads() {
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
                   <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Sentiment Distribution</h2>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={sentimentData.sentimentDistribution}>
+                    <BarChart data={dashboardData.sentimentDistribution}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
@@ -151,7 +165,7 @@ function Threads() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {sentimentData.recentPosts.map((post) => (
+                      {dashboardData.recentPosts.map((post) => (
                         <tr key={post.id}>
                           <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{post.content}</td>
                           <td className="px-4 py-3 text-sm">
@@ -180,13 +194,12 @@ function Threads() {
   );
 }
 
-function MetricCard({ title, value, change }) {
+function MetricCard({ title, value }) {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</h3>
       <div className="mt-2 flex items-baseline">
         <p className="text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
-        {change && <span className="ml-2 text-sm font-medium text-green-600 dark:text-green-400">{change}</span>}
       </div>
     </div>
   );

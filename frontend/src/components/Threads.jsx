@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { FiMoon, FiSun } from 'react-icons/fi';
 import Loading from './ui/Loading';
-import { SocialIcon } from 'react-social-icons';
 
 function Threads() {
   const [loading, setLoading] = useState(true);
@@ -16,6 +14,8 @@ function Threads() {
     avgRetweets: 0,
     verifiedProportion: 0,
   });
+  const [prevTotalPosts, setPrevTotalPosts] = useState(0);
+  const [showNewPostsMessage, setShowNewPostsMessage] = useState(false);
 
   const loadingStates = [
     { text: 'Connecting to server...' },
@@ -24,15 +24,19 @@ function Threads() {
     { text: 'Preparing dashboard...' },
   ];
 
-  useEffect(() => {
-    setLoading(true);
-    fetch('http://127.0.0.1:8000/posts')
+  const fetchData = () => {
+    fetch('http://127.0.0.1:8000/threads')
       .then(response => response.json())
       .then(data => {
         const { results, metrics } = data;
         const totalPosts = results.length;
 
-        // Use backend-provided sentiment trends
+        if (totalPosts > prevTotalPosts && prevTotalPosts !== 0) {
+          setShowNewPostsMessage(true);
+          setTimeout(() => setShowNewPostsMessage(false), 5000);
+        }
+        setPrevTotalPosts(totalPosts);
+
         const sentimentOverTime = metrics.sentiment_trends.time_periods.map((period, index) => ({
           period,
           positive: metrics.sentiment_trends.positive[index],
@@ -40,7 +44,6 @@ function Threads() {
           negative: metrics.sentiment_trends.negative[index],
         }));
 
-        // Calculate distribution from results
         const distributionCounts = results.reduce(
           (acc, item) => {
             acc[item.predicted_label] = (acc[item.predicted_label] || 0) + 1;
@@ -54,20 +57,15 @@ function Threads() {
           { name: 'Negative', value: distributionCounts.negative },
         ];
 
-        // Get real data for recent posts (last 5)
-        const allPosts = load_and_combine_data(); // Assuming this function is available or fetched separately
-        const recentPosts = results.slice(-5).map((item, index) => {
-          const originalPost = allPosts.find(p => p.text === item.text) || {};
-          return {
-            id: `post${index + 1}`,
-            content: item.text,
-            sentiment: item.predicted_label.charAt(0).toUpperCase() + item.predicted_label.slice(1),
-            date: originalPost.published_on ? new Date(originalPost.published_on).toLocaleDateString() : 'N/A',
-            likes: originalPost.like_count || 0,
-            reposts: originalPost.retweet_count || 0,
-            comments: originalPost.comment_count || 0,
-          };
-        });
+        const recentPosts = results.slice(-5).reverse().map((item, index) => ({
+          id: `post${index + 1}`,
+          content: item.text,
+          sentiment: item.predicted_label.charAt(0).toUpperCase() + item.predicted_label.slice(1),
+          date: new Date(item.published_on).toLocaleDateString(),
+          likes: item.like_count || 0,
+          reposts: item.retweet_count || 0,
+          comments: item.comment_count || 0,
+        }));
 
         setDashboardData({
           sentimentOverTime,
@@ -82,17 +80,14 @@ function Threads() {
       })
       .catch(error => console.error('Error fetching data:', error))
       .finally(() => setLoading(false));
-  }, []);
-
-  // Note: This function should ideally come from a separate data service
-  // For this example, I'm assuming it's available. In practice, you'd need to:
-  // 1. Fetch this data separately from the backend
-  // 2. Or include all necessary fields in the /posts endpoint
-  const load_and_combine_data = () => {
-    // Placeholder - in reality, this should fetch from backend or be included in /posts
-    return [];
   };
 
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
   return (
     <>
       {loading && <Loading loadingStates={loadingStates} duration={1000} loop={true} />}
@@ -114,7 +109,7 @@ function Threads() {
                 <MetricCard title="Total Keywords" value="83" />
                 <MetricCard title="Avg Comments" value={dashboardData.avgComments.toLocaleString()} />
                 <MetricCard title="Avg Likes" value={dashboardData.avgLikes.toLocaleString()} />
-                <MetricCard title="Avg Retweets" value={dashboardData.avgRetweets.toLocaleString()} />
+                <MetricCard title="Avg Reposts" value={dashboardData.avgRetweets.toLocaleString()} />
                 <MetricCard title="Percent Verified" value={`${dashboardData.verifiedProportion}%`} />
                 <MetricCard title="Time Range" value="2023-2025" />
               </div>
@@ -151,8 +146,11 @@ function Threads() {
               </div>
 
               <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
-                <div className="p-4 border-b dark:border-gray-700">
+                <div className="p-4 border-b dark:border-gray-700 flex items-center">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Posts</h2>
+                  {showNewPostsMessage && (
+                    <span className="ml-2 text-green-600 text-sm font-medium">New Posts Found!</span>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">

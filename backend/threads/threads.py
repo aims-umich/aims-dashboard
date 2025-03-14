@@ -30,7 +30,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             text TEXT NOT NULL,
             true_label TEXT NOT NULL,
-            predicted_label TEXT NOT NULL
+            predicted_label TEXT NOT NULL,
+            published_on TEXT NOT NULL
         )
     """)
     conn.commit()
@@ -70,7 +71,9 @@ def classify_text(text):
 def load_and_combine_data():
     train = pd.read_csv('./training_threads.csv', quotechar='"')
     test = pd.read_csv('./testing_threads.csv', quotechar='"')
-    return pd.concat([train, test], ignore_index=True)
+    all_data = pd.concat([train, test], ignore_index=True)
+    all_data['published_on'] = pd.to_datetime(all_data['published_on']).dt.strftime('%Y-%m-%d')
+    return all_data
 
 def calculate_averages(df):
   return {
@@ -84,29 +87,24 @@ def calculate_verified_proportion(df):
 
 def get_sentiment_trends(df):
     df['published_on'] = pd.to_datetime(df['published_on'])
-    
-    date_range = pd.date_range(start='2023-01-01', end='2024-12-31', freq='2M', tz='UTC')
-    
-    trends = {
-        "time_periods": [],
-        "positive": [],
-        "negative": [],
-        "neutral": []
-    }
-    
+
+    date_range = pd.date_range(start='2023-01-01', end='2024-12-31', freq='2M')
+
+    trends = {"time_periods": [], "positive": [], "negative": [], "neutral": []}
+
     for i in range(len(date_range) - 1):
         start_date = date_range[i]
         end_date = date_range[i + 1]
-        
+
         period_df = df[(df['published_on'] >= start_date) & (df['published_on'] < end_date)]
-        
+
         sentiment_counts = period_df['label'].value_counts()
-        
+
         trends["time_periods"].append(f"{start_date.strftime('%Y-%m')}-{end_date.strftime('%Y-%m')}")
         trends["positive"].append(int(sentiment_counts.get(2, 0)))
         trends["negative"].append(int(sentiment_counts.get(0, 0)))
         trends["neutral"].append(int(sentiment_counts.get(1, 0)))
-    
+
     return trends
 
 # --- Step 5: Populate database with sentiment analysis results ---
@@ -127,26 +125,19 @@ def populate_db():
 
     results = []
     for idx, row in all_data.iterrows():
-        text = row['text']
-        if pd.isna(text) or text is None:
-            text = ''
-        else:
-            text = str(text).strip()
-
+        text = str(row['text']).strip() if pd.notna(row['text']) else ''
         if not text:
             continue
-
+        
         true_label = id2label[row['label']]
-        try:
-            predicted_label = classify_text(text)
-            results.append((text, true_label, predicted_label))
-        except Exception as e:
-            print(f"error processing row {idx} with text '{text}': {str(e)}")
-            continue
+        predicted_label = classify_text(text)
+        published_on = row['published_on']
+
+        results.append((text, true_label, predicted_label, published_on))
 
     conn = sqlite3.connect("threads.db")
     c = conn.cursor()
-    c.executemany("INSERT INTO posts (text, true_label, predicted_label) VALUES (?, ?, ?)", results)
+    c.executemany("INSERT INTO posts (text, true_label, predicted_label, published_on) VALUES (?, ?, ?, ?)", results)
     conn.commit()
     conn.close()
     print("database populated successfully!")
@@ -167,15 +158,15 @@ def read_root():
     """
     return HTMLResponse(content=html_content)
 
-@app.get("/posts/")
+@app.get("/threads/")
 def get_posts():
     all_data = load_and_combine_data()
     all_data['label'] = all_data.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
-  
+
     conn = sqlite3.connect("threads.db")
     c = conn.cursor()
-    c.execute("SELECT text, true_label, predicted_label FROM posts")
-    results = [{"text": row[0], "true_label": row[1], "predicted_label": row[2]} for row in c.fetchall()]
+    c.execute("SELECT text, true_label, predicted_label, published_on FROM posts")
+    results = [{"text": row[0], "true_label": row[1], "predicted_label": row[2], "published_on": row[3]} for row in c.fetchall()]
     conn.close()
     
     averages = calculate_averages(all_data)

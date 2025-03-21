@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="Screenshot of Website" src="./public/homepage.png">
+  <img alt="Screenshot of Website" src="./frontend/public/homepage.png">
 </p>
 
 <h1 align="center">
@@ -27,6 +27,10 @@ The repository for the official website for the dashboard as featured at the ann
 ## ✍🏻 Authors
 
 - [@jere67](https://github.com/jere67)
+- [@akutira-umich](https://github.com/akutira-umich)
+- [@AndreGalaGarza](https://github.com/AndreGalaGarza)
+- [@HuawenShen](https://github.com/HuawenShen)
+- [@Patrickyang23](https://github.com/Patrickyang23)
 
 ## 🪪 License
 
@@ -35,16 +39,49 @@ Please do not deploy this directly to production. It is not a template and is no
 This project is open source and available under the [MIT License](LICENSE).
 
 ## 🛠️ Environment Setup
-### Frontend
-1. From the project root directory, install Node dependencies:
+### Prerequisites
 
-`npm install`
+Before starting, ensure you have the following tools installed:
+
+1. Git:
+   - Download: [https://git-scm.com/](https://git-scm.com/)
+   - Verify: `git --version`
+2. Node.js and npm:
+   - Download: [https://nodejs.org/](https://nodejs.org/) (LTS version recommended)
+   - Verify: `node --version` and `npm --version`
+3. Python:
+   - Download: [https://www.python.org/](https://www.python.org/) (version 3.8+ recommended)
+   - Verify: `python --version` or `python3 --version`
+
+### Local Setup
+
+1. Clone the Repository
+   ```bash
+   git clone https://github.com/jere67/aims-dashboard.git
+   cd aims-dashboard
+   ```
+  
+### Frontend
+1. From the ```/frontend``` directory, install Node dependencies:
+
+    `npm install`
 
 2. Start the Vite development server:
 
-`npm run dev`
+    `npm run dev`
 
 The frontend application will be running at `http://localhost:3000`
 
 ### Backend
-To-Do. 
+1. Create a virtual environment:
+  - ```python -m venv venv```
+  - And activate it:
+    - Windows: ```venv\Scripts\activate```
+    - macOS/Linux: ```source venv/bin/activate```
+
+2. From the ```/backend``` directory, install necessary Python packages:
+
+    `pip install -r requirements.txt`
+
+    - For Playwright, after installation, run:
+      - ```playwright install```

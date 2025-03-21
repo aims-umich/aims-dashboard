@@ -1,0 +1,10 @@
+numpy>=1.23.5
+pandas>=1.5.0
+torch>=2.0.0
+fastapi>=0.95.0
+uvicorn>=0.20.0
+transformers>=4.30.0
+jmespath>=1.0.1
+parsel>=1.8.0
+nested-lookup>=0.2.25
+playwright>=1.40.0

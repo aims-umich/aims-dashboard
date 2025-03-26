@@ -1,0 +1,200 @@
+body {
+    font-size: 1.1rem;
+    font-family: Arial, sans-serif;
+    margin: 10px 20px;
+    padding: 0px 30px;
+    color: #333;
+}
+
+nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1.2rem;
+}
+
+nav div a img {
+    height: 6rem;
+}
+
+nav ul {
+    display: flex;
+    flex-direction: row;
+    list-style: none;
+    padding: 10px;
+    justify-content: center;
+    margin: 0;
+}
+
+nav ul li {
+    margin: 0 15px;
+}
+
+nav ul li a {
+    color: #333;
+    text-decoration: none;
+    font-weight: bold;
+    transition: font-size 0.3s ease, 0.3s ease;
+}
+
+nav ul li a:hover{
+    font-size: 1.3rem;
+}
+
+
+h1 {
+    color: #2c3e50;
+    text-align: center;
+    font-size: 1.6rem;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+
+h2 {
+    color: #34495e;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 1.3rem;
+}
+
+p {
+    font-size: 16px;
+    line-height: 1.6;
+    font-size: 1.1rem;
+}
+
+.section-box {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 15px
+}
+
+.section-box p {
+    flex: 1;
+    text-align: center;
+    border-radius: 10px;
+    background: rgba(42, 42, 60, 0.1);
+    color: black;
+    padding: 15px;
+    margin: 0px;
+}
+
+.chart-container {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    width: 100%;
+    gap:15px;
+}
+
+.chart {
+    width: 48%;
+    min-width: 400px;
+    height: 250px;
+    flex: 1;
+    background: rgba(42, 42, 60, 0.1);
+    padding: 10px;
+    border-radius: 10px;
+    text-align: center;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.button-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+    margin: 0 auto; /* Center within the body */
+}
+
+.button-list button {
+    flex: 0 1 calc(100% / 12 - 10px); /* Ensures 12 buttons fit in a row */
+    /* max-width: calc(100% / 12 - 10px); */
+    text-align: center;
+    border-radius: 10px;
+    background: rgba(42, 42, 60, 0.1);
+    color: black;
+    padding: 10px;
+    margin: 0;
+}
+
+button {
+    font-size: 1.1rem;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+/* For screens smaller than 1024px, switch to 6 per row */
+@media (max-width: 1024px) {
+    .button-list button {
+        flex: 0 1 calc(100% / 6 - 10px);
+        max-width: calc(100% / 6 - 10px);
+    }
+}
+
+.button-list button:hover {
+    background: rgba(42, 42, 60, 0.2);
+}
+
+.articles-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    color: white;
+    border-radius: 10px;
+    overflow: hidden;
+    table-layout: fixed;
+}
+
+.articles-table th {
+    font-weight: bold;
+    padding: 10px;
+    border: 1px solid white;
+    text-align: left;
+}
+
+.articles-table td {
+    padding: 10px;
+    border: 1px solid rgba(42, 42, 60, 0.5);
+    text-align: left;
+}
+
+.articles-table thead tr {
+    background: rgba(42, 42, 60, 0.9);
+}
+
+.articles-table tbody tr:nth-child(odd) {
+    background: rgba(42, 42, 60, 0.1);
+    color: black;
+}
+
+.articles-table tbody tr:nth-child(even) {
+    color: black;
+}
+
+.articles-table tbody tr:hover {
+    background: rgba(42, 42, 60, 0.3);
+}
+
+/* Set fixed width for columns */
+.articles-table th:nth-child(1), .articles-table td:nth-child(1) {
+    width: 10%; /* Fixed width for Date column */
+}
+
+.articles-table th:nth-child(2), .articles-table td:nth-child(2) {
+    width: 30%; /* Fixed width for Author column */
+}
+
+.articles-table th:nth-child(3), .articles-table td:nth-child(3) {
+    width: 60%; /* Fixed width for Article column */
+}
+
+
+

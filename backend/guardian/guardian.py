@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import sqlite3
 import pandas as pd
@@ -13,6 +14,13 @@ from services.labeler import label_extracted_text
 
 # Initialize FastAPI app
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 # Connect to the SQLite database
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -230,5 +238,21 @@ def guardian_dashboard():
 @app.get("/articles.json")
 def get_articles_json():
     return articles_by_month
+
+@app.get("/guardian")
+def get_guardian_data():
+    return {
+        "sentiment_trend": df_sentiment_counts.to_dict(orient="records"),
+        "sentiment_distribution": df_overall_sentiment.to_dict(orient="records"),
+        "article_count": df_article_counts.to_dict(orient="records"),
+        "content_count": df_content_counts.to_dict(orient="records"),
+        "expected_months": expected_months,
+        "overview_stats": {
+            "total_articles": df_unique_articles.shape[0],
+            "total_content": df.shape[0],
+            "time_range_start": expected_months[0],
+            "time_range_end": expected_months[-1]
+        }
+    }
 
 # Run the app with: uvicorn guardian:app --reload

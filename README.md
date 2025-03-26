@@ -70,7 +70,7 @@ Before starting, ensure you have the following tools installed:
 
     `npm run dev`
 
-The frontend application will be running at `http://localhost:3000`
+The frontend application will be running at `http://localhost:5173`
 
 ### Backend
 1. Create a virtual environment:

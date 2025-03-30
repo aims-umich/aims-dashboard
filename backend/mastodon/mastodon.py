@@ -22,21 +22,43 @@ app.add_middleware(
 )
 
 # --- Step 2: Set up SQLite database ---
+import sqlite3
+
 def init_db():
     conn = sqlite3.connect("mastodon.db")
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS posts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            text TEXT NOT NULL,
-            true_label TEXT NOT NULL,
-            predicted_label TEXT NOT NULL
+            id TEXT PRIMARY KEY,
+            created_at TEXT,
+            in_reply_to_id TEXT,
+            in_reply_to_account_id TEXT,
+            sensitive BOOLEAN,
+            spoiler_text TEXT,
+            visibility TEXT,
+            language TEXT,
+            replies_count INTEGER,
+            reblogs_count INTEGER,
+            favourites_count INTEGER,
+            content TEXT,
+            account TEXT,
+            media_attachments TEXT,
+            tags TEXT,
+            application TEXT,
+            reblogged BOOLEAN,
+            favourited BOOLEAN,
+            bookmarked BOOLEAN,
+            muted BOOLEAN,
+            pinned BOOLEAN,
+            true_label TEXT,
+            predicted_label TEXT
         )
     """)
     conn.commit()
     conn.close()
 
 init_db()
+
 
 # --- Step 3: Load BERT checkpoint and model ---
 checkpoint = 'kumo24/bert-sentiment-nuclear'
@@ -73,16 +95,6 @@ def load_and_combine_data():
     all_data = pd.concat([train, test], ignore_index=True)
     return all_data
 
-def calculate_averages(df):
-  return {
-      "avg_comments": round(df['comment_count'].mean(), 2),
-      "avg_likes": round(df['like_count'].mean(), 2),
-      "avg_retweets": round(df['retweet_count'].mean(), 2)
-  }
-
-def calculate_verified_proportion(df):
-    return round(df['is_verified'].mean() * 100, 2)
-
 def get_sentiment_trends(df):
     df['published_on'] = pd.to_datetime(df['published_on'])
 
@@ -106,6 +118,19 @@ def get_sentiment_trends(df):
     return trends
 
 # --- Step 5: Populate database with sentiment analysis results ---
+def batch_classify_texts(texts, batch_size=32):
+    results = []
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]
+        inputs = tokenizer(batch_texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        with torch.no_grad():
+            outputs = model(**inputs)
+            preds = torch.argmax(outputs.logits, dim=1).cpu().numpy()
+        results.extend([id2label[p] for p in preds])
+    return results
+
+
 def populate_db():
     conn = sqlite3.connect("mastodon.db")
     c = conn.cursor()
@@ -121,23 +146,58 @@ def populate_db():
     all_data = load_and_combine_data()
     all_data['label'] = all_data.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
 
+    # Clean content and skip rows without content
+    all_data['content_clean'] = all_data['content'].fillna('').apply(str).str.strip()
+    all_data = all_data[all_data['content_clean'] != '']
+
+    texts = all_data['content_clean'].tolist()
+    predicted_labels = batch_classify_texts(texts)
+
     results = []
     for idx, row in all_data.iterrows():
-        text = str(row['text']).strip() if pd.notna(row['text']) else ''
-        if not text:
-            continue
-        
+        text = row['content_clean']
         true_label = id2label[row['label']]
-        predicted_label = classify_text(text)
+        predicted_label = predicted_labels[idx]
 
-        results.append((text, true_label, predicted_label))
+        record = (
+            row.get('id'),
+            row.get('created_at'),
+            row.get('in_reply_to_id'),
+            row.get('in_reply_to_account_id'),
+            row.get('sensitive', False),
+            row.get('spoiler_text', ''),
+            row.get('visibility'),
+            row.get('language'),
+            row.get('replies_count', 0),
+            row.get('reblogs_count', 0),
+            row.get('favourites_count', 0),
+            text,
+            str(row.get('account', '')),
+            str(row.get('media_attachments', '')),
+            str(row.get('tags', '')),
+            str(row.get('application', '')),
+            row.get('reblogged', False),
+            row.get('favourited', False),
+            row.get('bookmarked', False),
+            row.get('muted', False),
+            row.get('pinned', False),
+            true_label,
+            predicted_label
+        )
+        results.append(record)
 
     conn = sqlite3.connect("mastodon.db")
     c = conn.cursor()
-    c.executemany(
-        "INSERT INTO posts (text, true_label, predicted_label) VALUES (?, ?, ?)",
-        results
-    )
+    c.executemany("""
+        INSERT INTO posts (
+            id, created_at, in_reply_to_id, in_reply_to_account_id,
+            sensitive, spoiler_text, visibility, language,
+            replies_count, reblogs_count, favourites_count,
+            content, account, media_attachments, tags, application,
+            reblogged, favourited, bookmarked, muted, pinned,
+            true_label, predicted_label
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, results)
     conn.commit()
     conn.close()
     print("database populated successfully!")
@@ -162,15 +222,26 @@ def read_root():
 def get_posts():
     conn = sqlite3.connect("mastodon.db")
     c = conn.cursor()
-    c.execute("SELECT text, true_label, predicted_label FROM posts")
+    c.execute("""
+        SELECT id, created_at, content, language, visibility, replies_count,
+               reblogs_count, favourites_count, true_label, predicted_label
+        FROM posts
+    """)
     results = [
         {
-            "text": row[0],
-            "true_label": row[1],
-            "predicted_label": row[2]
+            "id": row[0],
+            "created_at": row[1],
+            "content": row[2],
+            "language": row[3],
+            "visibility": row[4],
+            "replies": row[5],
+            "reblogs": row[6],
+            "favourites": row[7],
+            "true_label": row[8],
+            "predicted_label": row[9],
         } for row in c.fetchall()
     ]
     conn.close()
     return {"results": results}
 
-# Run the app with: uvicorn threads:app --reload
+# Run the app with: uvicorn mastodon:app --reload

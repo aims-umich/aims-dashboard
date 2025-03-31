@@ -37,9 +37,9 @@ def init_db():
             spoiler_text TEXT,
             visibility TEXT,
             language TEXT,
-            replies_count INTEGER,
-            reblogs_count INTEGER,
-            favourites_count INTEGER,
+            comments_count INTEGER,
+            reposts_count INTEGER,
+            likes_count INTEGER,
             content TEXT,
             account TEXT,
             media_attachments TEXT,
@@ -96,7 +96,7 @@ def load_and_combine_data():
     return all_data
 
 def get_sentiment_trends(df):
-    df['published_on'] = pd.to_datetime(df['published_on'])
+    df['created_at'] = pd.to_datetime(df['created_at'])
 
     date_range = pd.date_range(start='2023-01-01', end='2024-12-31', freq='2M')
 
@@ -106,7 +106,7 @@ def get_sentiment_trends(df):
         start_date = date_range[i]
         end_date = date_range[i + 1]
 
-        period_df = df[(df['published_on'] >= start_date) & (df['published_on'] < end_date)]
+        period_df = df[(df['created_at'] >= start_date) & (df['created_at'] < end_date)]
 
         sentiment_counts = period_df['label'].value_counts()
 
@@ -116,6 +116,16 @@ def get_sentiment_trends(df):
         trends["neutral"].append(int(sentiment_counts.get(1, 0)))
 
     return trends
+
+def calculate_averages(df):
+  return {
+      "avg_comments": round(df['comments_count'].mean(), 2),
+      "avg_reposts": round(df['reposts_count'].mean(), 2),
+      "avg_likes": round(df['likes_count'].mean(), 2)
+  }
+  
+def calculate_sensitive_proportion(df):
+    return round(df['sensitive'].mean() * 100, 2)
 
 # --- Step 5: Populate database with sentiment analysis results ---
 def batch_classify_texts(texts, batch_size=32):
@@ -168,9 +178,9 @@ def populate_db():
             row.get('spoiler_text', ''),
             row.get('visibility'),
             row.get('language'),
-            row.get('replies_count', 0),
-            row.get('reblogs_count', 0),
-            row.get('favourites_count', 0),
+            row.get('comments_count', 0),
+            row.get('reposts_count', 0),
+            row.get('likes_count', 0),
             text,
             str(row.get('account', '')),
             str(row.get('media_attachments', '')),
@@ -192,7 +202,7 @@ def populate_db():
         INSERT INTO posts (
             id, created_at, in_reply_to_id, in_reply_to_account_id,
             sensitive, spoiler_text, visibility, language,
-            replies_count, reblogs_count, favourites_count,
+            comments_count, reposts_count, likes_count,
             content, account, media_attachments, tags, application,
             reblogged, favourited, bookmarked, muted, pinned,
             true_label, predicted_label
@@ -222,26 +232,50 @@ def read_root():
 def get_posts():
     conn = sqlite3.connect("mastodon.db")
     c = conn.cursor()
-    c.execute("""
-        SELECT id, created_at, content, language, visibility, replies_count,
-               reblogs_count, favourites_count, true_label, predicted_label
+    df = pd.read_sql_query("""
+        SELECT id, created_at, content, language, visibility, comments_count,
+               reposts_count, likes_count, true_label, predicted_label, account
         FROM posts
-    """)
-    results = [
-        {
-            "id": row[0],
-            "created_at": row[1],
-            "content": row[2],
-            "language": row[3],
-            "visibility": row[4],
-            "replies": row[5],
-            "reblogs": row[6],
-            "favourites": row[7],
-            "true_label": row[8],
-            "predicted_label": row[9],
-        } for row in c.fetchall()
-    ]
+    """, conn)
+
     conn.close()
-    return {"results": results}
+
+    # Convert date
+    df['created_at'] = pd.to_datetime(df['created_at'])
+
+    # Basic results
+    results = df.to_dict(orient='records')
+
+    # --- METRICS ---
+
+    # Averages
+    averages = {
+        "comments": df["comments_count"].mean(),
+        "likes": df["likes_count"].mean(),
+        "reposts": df["reposts_count"].mean()
+    }
+
+    # Verified proportion
+    def is_verified(account_json):
+        try:
+            account_dict = eval(account_json)
+            return account_dict.get('verified', False) or len(account_dict.get('fields', [])) > 0
+        except:
+            return False
+
+    df['verified'] = df['account'].apply(is_verified)
+    verified_proportion = df['verified'].mean()
+
+    # Sentiment trends
+    sentiment_trends = get_sentiment_trends(df)
+
+    return {
+        "results": results,
+        "metrics": {
+            "averages": averages,
+            "verified_proportion": verified_proportion,
+            "sentiment_trends": sentiment_trends
+        }
+    }
 
 # Run the app with: uvicorn mastodon:app --reload

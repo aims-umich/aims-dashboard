@@ -6,6 +6,7 @@ import os
 import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta, timezone
+from dateutil.relativedelta import relativedelta
 import plotly.express as px
 import json
 from services.scraper import GuardianScraper
@@ -99,7 +100,7 @@ query = """
     SELECT e.id, e.article_id, a.author, a.title, a.publish_date, e.extracted_text, e.label, e.score
     FROM extracted_content e
     JOIN articles a ON e.article_id = a.id
-    WHERE a.publish_date >= date('now', '-11 months', 'start of month')
+    WHERE a.publish_date >= datetime('now', '-11 months', 'start of month')
 """
 conn = sqlite3.connect(DATABASE_PATH)
 df = pd.read_sql_query(query, conn)
@@ -126,9 +127,9 @@ df_sentiment_counts = df.groupby(["Year-Month", "label"]).size().reset_index(nam
 # Overall sentiment distribution
 df_overall_sentiment = df.groupby("label").size().reset_index(name="Total Count")
 
-# Generate a complete list of expected months (last 12 months including the current one)
-today = datetime.today()
-expected_months = [(today.replace(day=1) - timedelta(days=i * 30)).strftime("%Y-%m") for i in range(11, -1, -1)]
+# Use UTC instead of local time
+today = datetime.now(timezone.utc)
+expected_months = [(today.replace(day=1) - relativedelta(months=i)).strftime("%Y-%m") for i in range(0, 12)]
 
 # Store articles by month
 articles_by_month = {

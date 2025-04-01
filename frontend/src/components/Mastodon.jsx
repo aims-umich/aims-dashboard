@@ -85,9 +85,9 @@ function Mastodon() {
           content: item.content,
           sentiment: item.predicted_label.charAt(0).toUpperCase() + item.predicted_label.slice(1),
           date: new Date(item.created_at).toLocaleDateString(),
-          likes: item.likes || 0,
-          reposts: item.reposts || 0,
-          comments: item.comments || 0,
+          likes: item.favourites_count || 0,
+          reposts: item.reblogs_count || 0,
+          comments: item.replies_count || 0,
         }))
 
         const sentimentAccuracy = processSentimentAccuracy(results)
@@ -101,9 +101,9 @@ function Mastodon() {
           recentPosts,
           totalPosts,
           avgComments: data.metrics.averages.comments,
-          avgLikes: data.metrics.averages.likes,
-          avgReposts: data.metrics.averages.reposts,
-          verifiedProportion: data.metrics.verified_proportion,
+          avgReplies: data.metrics.averages.replies,
+          avgFavourites: data.metrics.averages.favourites,
+          avgReblogs: data.metrics.averages.reblogs,
           sentimentAccuracy,
           engagementTrends,
           wordFrequencyBySentiment,
@@ -142,9 +142,9 @@ function Mastodon() {
         if (!engagementByDate[date]) {
           engagementByDate[date] = { likes: 0, comments: 0, reposts: 0, count: 0 }
         }
-        engagementByDate[date].likes += post.likes || 0
-        engagementByDate[date].comments += post.comments || 0
-        engagementByDate[date].reposts += post.reposts || 0
+        engagementByDate[date].likes += post.favourites_count || 0
+        engagementByDate[date].comments += post.replies_count || 0
+        engagementByDate[date].reposts += post.reblogs_count || 0
         engagementByDate[date].count += 1
       }
     })
@@ -231,9 +231,9 @@ function Mastodon() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <MetricCard title="Total Posts" value={dashboardData.totalPosts.toLocaleString()} />
                 <MetricCard title="Total Keywords" value="83" />
-                <MetricCard title="Avg. Comments" value={dashboardData.avgComments.toLocaleString()} />
-                <MetricCard title="Avg. Likes" value={dashboardData.avgLikes.toLocaleString()} />
-                <MetricCard title="Avg. Reposts" value={dashboardData.avgReposts.toLocaleString()} />
+                <MetricCard title="Avg. Replies" value={dashboardData.avgReplies.toLocaleString()} />
+                <MetricCard title="Avg. Favourites" value={dashboardData.avgFavourites.toLocaleString()} />
+                <MetricCard title="Avg. Reblogs" value={dashboardData.avgReblogs.toLocaleString()} />
                 <MetricCard title="Percent Verified" value={`${dashboardData.verifiedProportion}%`} />
                 <MetricCard title="Time Range" value="2023-2025" />
               </div>

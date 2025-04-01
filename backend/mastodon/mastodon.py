@@ -37,9 +37,9 @@ def init_db():
             spoiler_text TEXT,
             visibility TEXT,
             language TEXT,
-            comments_count INTEGER,
-            reposts_count INTEGER,
-            likes_count INTEGER,
+            replies_count INTEGER,
+            reblogs_count INTEGER,
+            favourites_count INTEGER,
             content TEXT,
             account TEXT,
             media_attachments TEXT,
@@ -98,7 +98,7 @@ def load_and_combine_data():
 def get_sentiment_trends(df):
     df['created_at'] = pd.to_datetime(df['created_at'])
 
-    date_range = pd.date_range(start='2023-01-01', end='2024-12-31', freq='2M')
+    date_range = pd.date_range(start='2023-01-01', end='2024-12-31', freq='2M').tz_localize('UTC')
 
     trends = {"time_periods": [], "positive": [], "negative": [], "neutral": []}
 
@@ -108,7 +108,7 @@ def get_sentiment_trends(df):
 
         period_df = df[(df['created_at'] >= start_date) & (df['created_at'] < end_date)]
 
-        sentiment_counts = period_df['label'].value_counts()
+        sentiment_counts = period_df['predicted_label'].value_counts()
 
         trends["time_periods"].append(f"{start_date.strftime('%Y-%m')}-{end_date.strftime('%Y-%m')}")
         trends["positive"].append(int(sentiment_counts.get(2, 0)))
@@ -119,9 +119,9 @@ def get_sentiment_trends(df):
 
 def calculate_averages(df):
   return {
-      "avg_comments": round(df['comments_count'].mean(), 2),
-      "avg_reposts": round(df['reposts_count'].mean(), 2),
-      "avg_likes": round(df['likes_count'].mean(), 2)
+      "avg_comments": round(df['replies_count'].mean(), 2),
+      "avg_reposts": round(df['reblogs_count'].mean(), 2),
+      "avg_likes": round(df['favourites_count'].mean(), 2)
   }
   
 def calculate_sensitive_proportion(df):
@@ -178,9 +178,9 @@ def populate_db():
             row.get('spoiler_text', ''),
             row.get('visibility'),
             row.get('language'),
-            row.get('comments_count', 0),
-            row.get('reposts_count', 0),
-            row.get('likes_count', 0),
+            row.get('replies_count', 0),
+            row.get('reblogs_count', 0),
+            row.get('favourites_count', 0),
             text,
             str(row.get('account', '')),
             str(row.get('media_attachments', '')),
@@ -202,7 +202,7 @@ def populate_db():
         INSERT INTO posts (
             id, created_at, in_reply_to_id, in_reply_to_account_id,
             sensitive, spoiler_text, visibility, language,
-            comments_count, reposts_count, likes_count,
+            replies_count, reblogs_count, favourites_count,
             content, account, media_attachments, tags, application,
             reblogged, favourited, bookmarked, muted, pinned,
             true_label, predicted_label
@@ -233,8 +233,8 @@ def get_posts():
     conn = sqlite3.connect("mastodon.db")
     c = conn.cursor()
     df = pd.read_sql_query("""
-        SELECT id, created_at, content, language, visibility, comments_count,
-               reposts_count, likes_count, true_label, predicted_label, account
+        SELECT id, created_at, content, language, visibility, replies_count,
+               reblogs_count, favourites_count, true_label, predicted_label, account
         FROM posts
     """, conn)
 
@@ -250,9 +250,9 @@ def get_posts():
 
     # Averages
     averages = {
-        "comments": df["comments_count"].mean(),
-        "likes": df["likes_count"].mean(),
-        "reposts": df["reposts_count"].mean()
+        "replies": df["replies_count"].mean(),
+        "reblogs": df["reblogs_count"].mean(),
+        "favourites": df["favourites_count"].mean()
     }
 
     # Verified proportion

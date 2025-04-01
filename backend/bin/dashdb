@@ -1,0 +1,60 @@
+#!/bin/bash
+# dashdb
+
+# Exit on errors
+set -Eeuo pipefail
+
+# Command line usage information
+usage() {
+    echo "Usage: $0 (create|destroy|reset|dump)"
+}
+
+if [ $# -ne 1 ]; then
+    usage
+    exit 1
+fi
+
+case $1 in
+    "create")
+        # If the database file exists, then exit
+        if [ -f "var/dashdb.sqlite3" ]; then
+            echo "Error: database already exists"
+            exit 1
+        fi
+
+        # Create and initialize the database
+        sqlite3 "var/dashdb.sqlite3" < "sql/schema.sql"
+        sqlite3 "var/dashdb.sqlite3" < "sql/data.sql"
+        echo "Database created and initialized."
+        ;;
+
+    "destroy")
+        # Remove the database file
+        rm -rf "var/dashdb.sqlite3"
+        echo "Database destroyed."
+        ;;
+
+    "reset")
+        # Reset: remove and recreate the database
+        rm -rf "var/dashdb.sqlite3"
+        sqlite3 "var/dashdb.sqlite3" < "sql/schema.sql"
+        sqlite3 "var/dashdb.sqlite3" < "sql/data.sql"
+        echo "Database reset complete."
+        ;;
+
+    "dump")
+        # If the database does not exist, then exit
+        if [ ! -f "var/dashdb.sqlite3" ]; then
+            echo "Error: database does not exist"
+            exit 1
+        fi
+
+        # Dump all data from the records table (modify if there are multiple tables)
+        sqlite3 -batch -line var/dashdb.sqlite3 'SELECT * FROM records'
+        ;;
+
+    *)
+        usage
+        exit 1
+        ;;
+esac

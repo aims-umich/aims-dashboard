@@ -24,13 +24,7 @@ import {
 import { TagCloud } from "react-tagcloud"
 import Loading from "./ui/Loading"
 
-const YouTube = () => {
-  return (
-    <div>YouTube</div>
-  )
-}
-
-function Youtube() {
+function YouTube() {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState({
     sentimentOverTime: [],
@@ -629,4 +623,4 @@ function MetricCard({ title, value }) {
   )
 }
 
-export default YouTube;
+export default YouTube

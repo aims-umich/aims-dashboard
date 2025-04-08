@@ -145,6 +145,22 @@ def get_guardian_data():
     today = datetime.now(timezone.utc)
     expected_months = [(today.replace(day=1) - relativedelta(months=i)).strftime("%Y-%m") for i in range(0, 12)]
     
+    # Filter articles from the last 30 days
+    thirty_days_ago = today - timedelta(days=30)
+    latest_articles = df_unique_articles[df_unique_articles["publish_date"] >= thirty_days_ago][
+        ["title", "author", "publish_date"]
+    ]
+    
+    # Format as list of dicts
+    latest_articles_data = latest_articles.sort_values(by="publish_date", ascending=False).apply(
+        lambda row: {
+            "title": row["title"],
+            "author": row["author"],
+            "date": str(row["publish_date"].date())
+        },
+        axis=1
+    ).tolist()
+    
     # Prepare result rows for frontend sentiment processing
     results = df[["extracted_text", "label"]].dropna().to_dict(orient="records")
 
@@ -154,6 +170,7 @@ def get_guardian_data():
         "article_count": df_article_counts.to_dict(orient="records"),
         "content_count": df_content_counts.to_dict(orient="records"),
         "expected_months": expected_months,
+        "latest_articles": latest_articles_data,
         "results": results,
         "overview_stats": {
             "total_articles": df_unique_articles.shape[0],

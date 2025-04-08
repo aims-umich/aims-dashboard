@@ -179,34 +179,5 @@ def get_guardian_data():
             "time_range_end": expected_months[-1]
         }
     }
- 
-# API: Articles by month for article viewer    
-@app.get("/articles.json")
-def get_articles_json():
-    conn = sqlite3.connect(DATABASE_PATH)
-    df = pd.read_sql_query("""
-        SELECT a.id, a.author, a.title, a.publish_date
-        FROM articles a
-        WHERE a.processed_status = 'processed'
-        ORDER BY publish_date DESC
-    """, conn)
-    conn.close()
-
-    df["publish_date"] = pd.to_datetime(df["publish_date"], errors='coerce')
-    df["Year-Month"] = df["publish_date"].dt.to_period("M").astype(str)
-    
-    # Store articles by month
-    articles_by_month = {
-        month: [
-            {
-                "title": row["title"],
-                "author": row["author"],
-                "date": str(row["publish_date"].date())
-            }
-            for _, row in df[df["Year-Month"] == month].iterrows()
-        ]
-        for month in df["Year-Month"].dropna().unique()
-    }
-    return JSONResponse(content=articles_by_month)
 
 # Run the app with: uvicorn guardian:app --reload

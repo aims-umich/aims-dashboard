@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 
 from threads.threads import app as threads_app
 from mastodon.mastodon import app as mastodon_app
+from guardian.guardian import app as guardian_app
 
 app = FastAPI()
 
@@ -17,6 +18,7 @@ app.add_middleware(
 
 app.mount("/threads", threads_app)
 app.mount("/mastodon", mastodon_app)
+app.mount("/guardian", guardian_app)
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -29,6 +31,7 @@ def read_root():
         <ul>
             <li><a href='/threads'>Threads API</a></li>
             <li><a href='/mastodon'>Mastodon API</a></li>
+            <li><a href='/guardian/'>Guardian API</a></li>
         </ul>
     </body>
     </html>

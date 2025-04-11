@@ -3,14 +3,15 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import sqlite3
+import sys
 import json
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 from apscheduler.schedulers.background import BackgroundScheduler
-from services.scraper import GuardianScraper
-from services.processor import process_articles
-from services.labeler import label_extracted_text
+from guardian.services.scraper import GuardianScraper
+from guardian.services.processor import process_articles
+from guardian.services.labeler import label_extracted_text
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -105,7 +106,7 @@ scheduler.add_job(lambda: ensure_data_is_up_to_date(force=True), 'interval', day
 scheduler.start()
 
 # API: Guardian dashboard data
-@app.get("/guardian")
+@app.get("/")
 def get_guardian_data():
     ensure_data_is_up_to_date()  # Trigger update on demand
     

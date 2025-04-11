@@ -24,7 +24,7 @@ app.add_middleware(
 
 # --- Step 2: Set up SQLite database ---
 def init_db():
-    conn = sqlite3.connect("youtube.db")
+    conn = sqlite3.connect("./youtube/youtube.db")
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS videos (
@@ -73,7 +73,7 @@ def classify_text(text):
 
 # --- Step 5: Load and split dataset ---
 def load_and_split_data():
-    data = pd.read_csv("Youtube_Label.csv", quotechar='"')
+    data = pd.read_csv("./youtube/Youtube_Label.csv", quotechar='"')
 
     # Ensure required columns exist
     required_columns = {'comment_text', 'Sentiment', 'published_at', 'like_count', 'comment_count'}
@@ -128,7 +128,7 @@ def get_youtube_trends(df):
 
 # --- Step 6: Populate database with sentiment analysis results ---
 def populate_db():
-    conn = sqlite3.connect("youtube.db")
+    conn = sqlite3.connect("./youtube/youtube.db")
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM videos")
     count = c.fetchone()[0]
@@ -157,7 +157,7 @@ def populate_db():
 
         results.append((text, true_label, predicted_label, published_on, like_count, comment_count))
 
-    conn = sqlite3.connect("youtube.db")
+    conn = sqlite3.connect("./youtube/youtube.db")
     c = conn.cursor()
     c.executemany(
         "INSERT INTO videos (text, true_label, predicted_label, published_on, like_count, comment_count) VALUES (?, ?, ?, ?, ?, ?)",
@@ -170,26 +170,26 @@ def populate_db():
 populate_db()
 
 # --- Step 7: FastAPI routes ---
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    html_content = """
-    <html>
-    <head><title>YouTube Sentiment API</title></head>
-    <body>
-        <h1>YouTube Sentiment API</h1>
-        <p>Go to <a href='/videos/'>Videos</a> for sentiment data (JSON).</p>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+# @app.get("/", response_class=HTMLResponse)
+# def read_root():
+#     html_content = """
+#     <html>
+#     <head><title>YouTube Sentiment API</title></head>
+#     <body>
+#         <h1>YouTube Sentiment API</h1>
+#         <p>Go to <a href='/videos/'>Videos</a> for sentiment data (JSON).</p>
+#     </body>
+#     </html>
+#     """
+#     return HTMLResponse(content=html_content)
 
-@app.get("/videos/")
+@app.get("/")
 def get_videos():
     train, test = load_and_split_data()
     all_data = pd.concat([train, test], ignore_index=True)
     all_data['label'] = all_data.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
 
-    conn = sqlite3.connect("youtube.db")
+    conn = sqlite3.connect("./youtube/youtube.db")
     c = conn.cursor()
     c.execute("SELECT text, true_label, predicted_label, published_on, like_count, comment_count FROM videos ORDER BY published_on ASC")
     results = [

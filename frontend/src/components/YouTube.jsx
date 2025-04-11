@@ -210,7 +210,7 @@ function YouTube() {
   };
 
   const fetchData = () => {
-    fetch("http://127.0.0.1:8000/videos/")
+    fetch("http://127.0.0.1:8000/youtube/")
       .then((response) => response.json())
       .then((data) => {
         const { results, metrics } = data;

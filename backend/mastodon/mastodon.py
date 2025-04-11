@@ -2,6 +2,7 @@ import warnings
 import sqlite3
 import numpy as np
 import pandas as pd
+import ast
 import torch
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -234,7 +235,8 @@ def get_posts():
     c = conn.cursor()
     df = pd.read_sql_query("""
         SELECT id, created_at, content, language, visibility, replies_count,
-               reblogs_count, favourites_count, true_label, predicted_label, account
+               reblogs_count, favourites_count, true_label, predicted_label, account,
+               media_attachments, sensitive
         FROM posts
     """, conn)
 
@@ -255,17 +257,16 @@ def get_posts():
         "favourites": df["favourites_count"].mean()
     }
 
-    # Verified proportion
-    def is_verified(account_json):
-        try:
-            account_dict = eval(account_json)
-            return account_dict.get('verified', False) or len(account_dict.get('fields', [])) > 0
-        except:
-            return False
+    # Sensitive proportion
+    sensitive_proportion = df['sensitive'].mean()
 
-    df['verified'] = df['account'].apply(is_verified)
-    verified_proportion = df['verified'].mean()
+    # Media proportion
+    def has_media(media):
+        return media != "[]"
 
+    df['has_media'] = df['media_attachments'].apply(has_media)
+    media_proportion = df['has_media'].mean()
+        
     # Sentiment trends
     sentiment_trends = get_sentiment_trends(df)
 
@@ -273,7 +274,8 @@ def get_posts():
         "results": results,
         "metrics": {
             "averages": averages,
-            "verified_proportion": verified_proportion,
+            "sensitive_proportion": sensitive_proportion,
+            "media_proportion": media_proportion,
             "sentiment_trends": sentiment_trends
         }
     }

@@ -27,19 +27,13 @@ app.add_middleware(
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_PATH = os.path.join(ROOT_DIR, "database", "guardian.db")
 
-UPDATE_INTERVAL = timedelta(days=3)
-last_updated = None
+last_checked_time = None 
 
 # Ensure the database is updated
-def ensure_data_is_up_to_date(force=False):
+def ensure_data_is_up_to_date():
     """Check if latest 1-year data is scraped, processed, and labeled. If not, update it."""
-    
-    global last_updated
-    now = datetime.now(timezone.utc)
-    if not force and last_updated and (now - last_updated) < UPDATE_INTERVAL:
-        print("Data is up-to-date. Skipping update.")
-        return
-    
+    global last_checked_time
+
     print("Running Guardian data update...")
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
@@ -48,32 +42,37 @@ def ensure_data_is_up_to_date(force=False):
     cursor.execute("SELECT COUNT(*) FROM articles;")
     articles_before = cursor.fetchone()[0]
     
-    # **Step 2: Get the latest publish_date**
-    cursor.execute("SELECT MAX(publish_date) FROM articles;")
-    latest_date = cursor.fetchone()[0]
-
-    # **Step 3: Define date range for scraping**
-    today = datetime.today().strftime("%Y-%m-%dT%H:%M:%SZ")
-    one_year_ago = (datetime.today() - timedelta(days=365)).strftime("%Y-%m-%d")
+    # **Step 2: Decide scraping time range**
+    now_utc = datetime.now(timezone.utc)
+    to_date = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     
-    # If no articles exist, scrape the entire past year
-    if not latest_date:
-        print("No articles found. Scraping the past 12 months...")
-        scraper = GuardianScraper(from_date=one_year_ago, to_date=today, db_path=DATABASE_PATH)
-        scraper.scrape_articles()
-        
+    # Initialize `last_checked_time` if it's not already set
+    if last_checked_time is None:
+        cursor.execute("SELECT MAX(publish_date) FROM articles;")
+        latest_date = cursor.fetchone()[0]
+        # If the database has at least one article, use its latest publish_date
+        if latest_date:
+            last_checked_time = datetime.strptime(latest_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            print(f"Initialized last_checked_time from the database: {last_checked_time}")
+        else:
+            # Fallback to 1 year ago from today if no data in DB
+            last_checked_time = datetime.now(timezone.utc) - timedelta(days=365)
+            print("No articles in the database. Defaulting to one year ago.")
+    
+    # Use last_checked_time if available; otherwise fallback again to one year ago
+    if last_checked_time:
+        from_date = last_checked_time.strftime("%Y-%m-%dT%H:%M:%SZ")
     else:
-        # Convert latest_date to datetime object
-        latest_date_dt = datetime.strptime(latest_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-        
-        # **Check if today's date is ahead of the last scraped article**
-        if latest_date_dt < datetime.now(timezone.utc):
-            from_date = latest_date_dt.strftime("%Y-%m-%dT%H:%M:%SZ")  # Start from the next missing day
-            print(f"Scraping articles from {from_date} to {today}...")
-            
-            scraper = GuardianScraper(from_date=from_date, to_date=today, db_path=DATABASE_PATH)
-            scraper.scrape_articles()
-        
+        one_year_ago = datetime.today() - timedelta(days=365)
+        from_date = one_year_ago.strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    print(f"Scraping articles from {from_date} to {to_date}...")    
+    scraper = GuardianScraper(from_date=from_date, to_date=to_date, db_path=DATABASE_PATH)
+    scraper.scrape_articles()
+    
+    # Step 3: Update the last checked time
+    last_checked_time = now_utc
+    
     # **Step 4: Count articles after scraping**
     cursor.execute("SELECT COUNT(*) FROM articles;")
     articles_after = cursor.fetchone()[0]
@@ -97,12 +96,12 @@ def ensure_data_is_up_to_date(force=False):
         print("All extracted nuclear content is already labeled.")
 
     conn.close()
-    last_updated = now
+    # last_updated = now
     print("Data is up to date.")
 
-# Schedule it every 3 days
+# Schedule the update
 scheduler = BackgroundScheduler()
-scheduler.add_job(lambda: ensure_data_is_up_to_date(force=True), 'interval', days=3)
+scheduler.add_job(lambda: ensure_data_is_up_to_date(), trigger='cron', hour=3, minute=0)
 scheduler.start()
 
 # API: Guardian dashboard data

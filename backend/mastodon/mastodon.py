@@ -2,6 +2,7 @@ import warnings
 import sqlite3
 import numpy as np
 import pandas as pd
+import ast
 import torch
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -25,7 +26,7 @@ app.add_middleware(
 import sqlite3
 
 def init_db():
-    conn = sqlite3.connect("mastodon.db")
+    conn = sqlite3.connect("./mastodon/mastodon.db")
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS posts (
@@ -90,8 +91,8 @@ def classify_text(text):
     return id2label[predicted_class]
 
 def load_and_combine_data():
-    train = pd.read_csv('./training_mastodon.csv', quotechar='"')
-    test = pd.read_csv('./testing_mastodon.csv', quotechar='"')
+    train = pd.read_csv('./mastodon/training_mastodon.csv', quotechar='"')
+    test = pd.read_csv('./mastodon/testing_mastodon.csv', quotechar='"')
     all_data = pd.concat([train, test], ignore_index=True)
     return all_data
 
@@ -142,7 +143,7 @@ def batch_classify_texts(texts, batch_size=32):
 
 
 def populate_db():
-    conn = sqlite3.connect("mastodon.db")
+    conn = sqlite3.connect("./mastodon/mastodon.db")
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM posts")
     count = c.fetchone()[0]
@@ -196,7 +197,7 @@ def populate_db():
         )
         results.append(record)
 
-    conn = sqlite3.connect("mastodon.db")
+    conn = sqlite3.connect("./mastodon/mastodon.db")
     c = conn.cursor()
     c.executemany("""
         INSERT INTO posts (
@@ -215,26 +216,27 @@ def populate_db():
 populate_db()
 
 # --- Step 6: FastAPI routes ---
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    html_content = """
-    <html>
-    <head><title>Sentiment Classification API</title></head>
-    <body>
-        <h1>Sentiment Classification API</h1>
-        <p>Go to <a href='/posts/'>Posts</a> for all posts (JSON).</p>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+# @app.get("/", response_class=HTMLResponse)
+# def read_root():
+#     html_content = """
+#     <html>
+#     <head><title>Sentiment Classification API</title></head>
+#     <body>
+#         <h1>Sentiment Classification API</h1>
+#         <p>Go to <a href='/posts/'>Posts</a> for all posts (JSON).</p>
+#     </body>
+#     </html>
+#     """
+#     return HTMLResponse(content=html_content)
 
-@app.get("/mastodon/")
+@app.get("/")
 def get_posts():
-    conn = sqlite3.connect("mastodon.db")
+    conn = sqlite3.connect("./mastodon/mastodon.db")
     c = conn.cursor()
     df = pd.read_sql_query("""
         SELECT id, created_at, content, language, visibility, replies_count,
-               reblogs_count, favourites_count, true_label, predicted_label, account
+               reblogs_count, favourites_count, true_label, predicted_label, account,
+               media_attachments, sensitive
         FROM posts
     """, conn)
 
@@ -255,17 +257,16 @@ def get_posts():
         "favourites": df["favourites_count"].mean()
     }
 
-    # Verified proportion
-    def is_verified(account_json):
-        try:
-            account_dict = eval(account_json)
-            return account_dict.get('verified', False) or len(account_dict.get('fields', [])) > 0
-        except:
-            return False
+    # Sensitive proportion
+    sensitive_proportion = df['sensitive'].mean()
 
-    df['verified'] = df['account'].apply(is_verified)
-    verified_proportion = df['verified'].mean()
+    # Media proportion
+    def has_media(media):
+        return media != "[]"
 
+    df['has_media'] = df['media_attachments'].apply(has_media)
+    media_proportion = df['has_media'].mean()
+        
     # Sentiment trends
     sentiment_trends = get_sentiment_trends(df)
 
@@ -273,7 +274,8 @@ def get_posts():
         "results": results,
         "metrics": {
             "averages": averages,
-            "verified_proportion": verified_proportion,
+            "sensitive_proportion": sensitive_proportion,
+            "media_proportion": media_proportion,
             "sentiment_trends": sentiment_trends
         }
     }

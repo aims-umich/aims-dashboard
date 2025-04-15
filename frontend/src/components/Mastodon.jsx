@@ -26,10 +26,10 @@ function Mastodon() {
     sentimentDistribution: [],
     recentPosts: [],
     totalPosts: 0,
-    avgComments: 0,
     avgLikes: 0,
     avgReposts: 0,
-    verifiedProportion: 0,
+    sensitiveProportion: 42,
+	mediaProportion: 42,
     sentimentAccuracy: [],
     engagementTrends: [],
     wordFrequencyBySentiment: {
@@ -95,15 +95,34 @@ function Mastodon() {
         const wordFrequencyBySentiment = processWordFrequencyBySentiment(results)
         const wordCloudData = processWordCloudData(results)
 
+		const transformSentimentTrends = (data) => {
+		  const { time_periods, positive, neutral, negative } = data;
+		  return time_periods.map((period, i) => ({
+			time_periods: period,
+			positive: positive[i],
+			neutral: neutral[i],
+			negative: negative[i]
+		  }));
+		};
+		
+		const getMaxValue = (metric) =>
+		  Math.max(...dashboardData.engagementTrends.map((d) => d[metric]));
+
+		const getIntensityColor = (baseColor, value, maxValue) => {
+		  const opacity = Math.max(0.1, value / maxValue); // avoid full transparency
+		  return `${baseColor}${Math.floor(opacity * 255).toString(16).padStart(2, "0")}`;
+		};
+		
         setDashboardData({
-          sentimentOverTime: data.metrics.sentiment_trends,
+          sentimentOverTime: transformSentimentTrends(data.metrics.sentiment_trends),
           sentimentDistribution,
           recentPosts,
           totalPosts,
-          avgComments: data.metrics.averages.comments,
           avgReplies: data.metrics.averages.replies,
           avgFavourites: data.metrics.averages.favourites,
           avgReblogs: data.metrics.averages.reblogs,
+		  sensitiveProportion: data.metrics.sensitive_proportion,
+		  mediaProportion: data.metrics.media_proportion,
           sentimentAccuracy,
           engagementTrends,
           wordFrequencyBySentiment,
@@ -234,7 +253,8 @@ function Mastodon() {
                 <MetricCard title="Avg. Replies" value={dashboardData.avgReplies.toLocaleString()} />
                 <MetricCard title="Avg. Favourites" value={dashboardData.avgFavourites.toLocaleString()} />
                 <MetricCard title="Avg. Reblogs" value={dashboardData.avgReblogs.toLocaleString()} />
-                <MetricCard title="Percent Verified" value={`${dashboardData.verifiedProportion}%`} />
+                <MetricCard title="Percent Sensitive" value={`${(dashboardData.sensitiveProportion * 100).toFixed(2)}%`} />
+				<MetricCard title="Percent With Media" value={`${(dashboardData.mediaProportion * 100).toFixed(2)}%`} />
                 <MetricCard title="Time Range" value="2023-2025" />
               </div>
 
@@ -244,8 +264,8 @@ function Mastodon() {
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={dashboardData.sentimentOverTime}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis />
+                      <XAxis dataKey="time_periods" />
+                      <YAxis domain={[0, 60]} />
                       <Tooltip />
                       <Legend />
                       <Line type="monotone" dataKey="positive" stroke="#10B981" />
@@ -258,14 +278,32 @@ function Mastodon() {
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
                   <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Sentiment Distribution</h2>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={dashboardData.sentimentDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#6366F1" />
-                    </BarChart>
-                  </ResponsiveContainer>
+					  <BarChart data={dashboardData.sentimentDistribution}>
+						<CartesianGrid strokeDasharray="3 3" />
+						<XAxis dataKey="name" />
+						<YAxis />
+						<Tooltip />
+						<Bar dataKey="value">
+						  {dashboardData.sentimentDistribution.map((entry, index) => {
+							let color
+							switch (entry.name.toLowerCase()) {
+							  case "positive":
+								color = "#10B981" // green
+								break
+							  case "neutral":
+								color = "#6B7280" // gray
+								break
+							  case "negative":
+								color = "#EF4444" // red
+								break
+							  default:
+								color = "#6366F1" // fallback purple
+							}
+							return <Cell key={`cell-${index}`} fill={color} />
+						  })}
+						</Bar>
+					  </BarChart>
+					</ResponsiveContainer>
                 </div>
               </div>
 
@@ -295,18 +333,30 @@ function Mastodon() {
 
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
                   <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Engagement Trends Over Time</h2>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={dashboardData.engagementTrends}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="likes" stroke="#10B981" name="Likes" />
-                      <Line type="monotone" dataKey="comments" stroke="#6366F1" name="Comments" />
-                      <Line type="monotone" dataKey="reposts" stroke="#F59E0B" name="Reposts" />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height={100}>
+					  <LineChart data={dashboardData.engagementTrends}>
+						<XAxis dataKey="date" hide />
+						<YAxis />
+						<Tooltip />
+						<Line type="monotone" dataKey="likes" stroke="#10B981" name="Favourites" />
+					  </LineChart>
+				  </ResponsiveContainer>
+				  <ResponsiveContainer width="100%" height={100}>
+					  <LineChart data={dashboardData.engagementTrends}>
+						<XAxis dataKey="date" hide />
+						<YAxis />
+						<Tooltip />
+						<Line type="monotone" dataKey="comments" stroke="#6366F1" name="Replies" />
+					  </LineChart>
+				  </ResponsiveContainer>
+				  <ResponsiveContainer width="100%" height={100}>
+					  <LineChart data={dashboardData.engagementTrends}>
+						<XAxis dataKey="date" hide />
+						<YAxis />
+						<Tooltip />
+						<Line type="monotone" dataKey="reposts" stroke="#F59E0B" name="Reblogs" />
+					  </LineChart>
+				  </ResponsiveContainer>
                 </div>
               </div>
 

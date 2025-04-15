@@ -23,7 +23,7 @@ app.add_middleware(
 
 # --- Step 2: Set up SQLite database ---
 def init_db():
-    conn = sqlite3.connect("threads.db")
+    conn = sqlite3.connect("./threads/threads.db")
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS posts (
@@ -72,8 +72,8 @@ def classify_text(text):
     return id2label[predicted_class]
 
 def load_and_combine_data():
-    train = pd.read_csv('./training_threads.csv', quotechar='"')
-    test = pd.read_csv('./testing_threads.csv', quotechar='"')
+    train = pd.read_csv('./threads/training_threads.csv', quotechar='"')
+    test = pd.read_csv('./threads/testing_threads.csv', quotechar='"')
     all_data = pd.concat([train, test], ignore_index=True)
     all_data['published_on'] = pd.to_datetime(all_data['published_on']).dt.strftime('%Y-%m-%d')
     return all_data
@@ -112,7 +112,7 @@ def get_sentiment_trends(df):
 
 # --- Step 5: Populate database with sentiment analysis results ---
 def populate_db():
-    conn = sqlite3.connect("threads.db")
+    conn = sqlite3.connect("./threads/threads.db")
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM posts")
     count = c.fetchone()[0]
@@ -141,7 +141,7 @@ def populate_db():
 
         results.append((text, true_label, predicted_label, published_on, comment_count, like_count, retweet_count))
 
-    conn = sqlite3.connect("threads.db")
+    conn = sqlite3.connect("./threads/threads.db")
     c = conn.cursor()
     c.executemany(
         "INSERT INTO posts (text, true_label, predicted_label, published_on, comment_count, like_count, retweet_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -154,25 +154,25 @@ def populate_db():
 populate_db()
 
 # --- Step 6: FastAPI routes ---
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    html_content = """
-    <html>
-    <head><title>Sentiment Classification API</title></head>
-    <body>
-        <h1>Sentiment Classification API</h1>
-        <p>Go to <a href='/posts/'>Posts</a> for all posts (JSON).</p>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+# @app.get("/", response_class=HTMLResponse)
+# def read_root():
+#     html_content = """
+#     <html>
+#     <head><title>Sentiment Classification API</title></head>
+#     <body>
+#         <h1>Sentiment Classification API</h1>
+#         <p>Go to <a href='/posts/'>Posts</a> for all posts (JSON).</p>
+#     </body>
+#     </html>
+#     """
+#     return HTMLResponse(content=html_content)
 
-@app.get("/threads/")
+@app.get("/")
 def get_posts():
     all_data = load_and_combine_data()
     all_data['label'] = all_data.label.replace({'positive': 2, 'negative': 0, 'neutral': 1})
 
-    conn = sqlite3.connect("threads.db")
+    conn = sqlite3.connect("./threads/threads.db")
     c = conn.cursor()
     c.execute("SELECT text, true_label, predicted_label, published_on, comment_count, like_count, retweet_count FROM posts ORDER BY published_on ASC")
     results = [

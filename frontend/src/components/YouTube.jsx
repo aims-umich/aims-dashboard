@@ -24,13 +24,8 @@ import {
 import { TagCloud } from "react-tagcloud"
 import Loading from "./ui/Loading"
 
-const YouTube = () => {
-  return (
-    <div>YouTube</div>
-  )
-}
 
-function Youtube() {
+function YouTube() {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState({
     sentimentOverTime: [],
@@ -59,7 +54,8 @@ function Youtube() {
     { text: "Preparing dashboard..." },
   ]
 
-  const COLORS = ["#10B981", "#6B7280", "#EF4444", "#6366F1", "#F59E0B", "#8B5CF6"]
+  const COLORS = ["#10B981", "#6B7280", "#EF4444", "#6366F1", "#F59E0B", "#8B5CF6", "#FF0000", "#282828", "#FFCC00", "#282828"]
+
 
   const stopWords = new Set([
     "a",
@@ -255,6 +251,7 @@ function Youtube() {
           date: new Date(item.published_on).toLocaleDateString(),
           likes: item.like_count || 0,
           comments: item.comment_count || 0,
+          videoUrl: item.video_id ? `https://www.youtube.com/watch?v=${item.video_id}` : ""
         }));
 
         const sentimentAccuracy = processSentimentAccuracy(results);
@@ -372,12 +369,12 @@ function Youtube() {
     <>
       {loading && <Loading loadingStates={loadingStates} duration={1000} loop={true} />}
       {!loading && (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-          <header className="p-4 border-b dark:border-gray-800">
-            <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <div className="min-h-screen bg-white">
+          <header className="bg-[#FF0000] text-white p-4">
+            <div className="max-w-7xl mx-auto">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Youtube Video Posts</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Arvind Kutirakulam</p>
+                <h1 className="text-2xl font-bold">YouTube Dashboard</h1>
+                <p className="text-sm text-black-500 dark:text-black-400">Arvind Kutirakulam</p>
               </div>
             </div>
           </header>
@@ -394,7 +391,7 @@ function Youtube() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">YT Sentiment Trends</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-red-500 dark:text-red">YT Sentiment Trends</h2>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={dashboardData.sentimentOverTime}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -410,7 +407,7 @@ function Youtube() {
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">YT Sentiment Distribution</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-red-500 dark:text-red">YT Sentiment Distribution</h2>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={dashboardData.sentimentDistribution}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -425,7 +422,7 @@ function Youtube() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">YT Sentiment Accuracy</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-red-500 dark:text-red">YT Sentiment Accuracy</h2>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
@@ -448,7 +445,7 @@ function Youtube() {
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">YT Engagement Trends Over Time</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-red-500 dark:text-red">YT Engagement Trends Over Time</h2>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={dashboardData.engagementTrends}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -465,7 +462,7 @@ function Youtube() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                  <h2 className="text-lg font-semibold mb-4 text-red-500 dark:text-red">
                     Word Frequency by Sentiment
                   </h2>
                   <div className="flex border-b mb-4">
@@ -513,7 +510,7 @@ function Youtube() {
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Word Cloud</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-red-500 dark:text-red">Word Cloud</h2>
                   <div className="flex justify-center items-center h-[250px] overflow-hidden">
                     <TagCloud
                       minSize={12}
@@ -559,7 +556,7 @@ function Youtube() {
 
               <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
                 <div className="p-4 border-b dark:border-gray-700 flex items-center">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Posts</h2>
+                  <h2 className="text-lg font-semibold mb-4 text-red-500 dark:text-red">Recent Posts</h2>
                   {showNewPostsMessage && (
                     <span className="ml-2 text-green-600 text-sm font-medium">New Posts Found!</span>
                   )}
@@ -579,6 +576,9 @@ function Youtube() {
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
                           Engagement
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                          Video
                         </th>
                       </tr>
                     </thead>
@@ -602,6 +602,15 @@ function Youtube() {
                           <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{post.date}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">
                             {`${post.likes} likes • ${post.reposts} reposts • ${post.comments} comments`}
+                          </td>
+                          <td className="align-middle text-center">
+                            {post.videoUrl ? (
+                              <a href={post.videoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
+                                Watch Video
+                              </a>
+                            ) : (
+                              "N/A"
+                            )}
                           </td>
                         </tr>
                       ))}

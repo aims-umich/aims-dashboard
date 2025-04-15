@@ -34,7 +34,8 @@ def init_db():
             predicted_label TEXT NOT NULL,
             published_on TEXT NOT NULL,
             like_count INTEGER DEFAULT 0,
-            comment_count INTEGER DEFAULT 0
+            comment_count INTEGER DEFAULT 0,
+            video_id TEXT NOT NULL
         )
     """)
     conn.commit()
@@ -155,14 +156,16 @@ def populate_db():
         like_count = int(row['like_count']) if pd.notna(row['like_count']) else 0
         comment_count = int(row['comment_count']) if pd.notna(row['comment_count']) else 0
 
-        results.append((text, true_label, predicted_label, published_on, like_count, comment_count))
+        video_id = row['video_id'] if 'video_id' in row and pd.notna(row['video_id']) else ''
+        results.append((text, true_label, predicted_label, published_on, like_count, comment_count, video_id))
 
     conn = sqlite3.connect("youtube.db")
     c = conn.cursor()
     c.executemany(
-        "INSERT INTO videos (text, true_label, predicted_label, published_on, like_count, comment_count) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO videos (text, true_label, predicted_label, published_on, like_count, comment_count, video_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
         results
     )
+
     conn.commit()
     conn.close()
     print("Database populated successfully!")
@@ -191,16 +194,18 @@ def get_videos():
 
     conn = sqlite3.connect("youtube.db")
     c = conn.cursor()
-    c.execute("SELECT text, true_label, predicted_label, published_on, like_count, comment_count FROM videos ORDER BY published_on ASC")
+    c.execute("SELECT text, true_label, predicted_label, published_on, like_count, comment_count, video_id FROM videos ORDER BY published_on ASC")
+
     results = [
-        {
-            "text": row[0],
-            "true_label": row[1],
-            "predicted_label": row[2],
-            "published_on": row[3],
-            "like_count": row[4],
-            "comment_count": row[5]
-        } for row in c.fetchall()
+    {
+        "text": row[0],
+        "true_label": row[1],
+        "predicted_label": row[2],
+        "published_on": row[3],
+        "like_count": row[4],
+        "comment_count": row[5],
+        "video_id": row[6]
+    } for row in c.fetchall()
     ]
     conn.close()
     

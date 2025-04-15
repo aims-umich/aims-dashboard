@@ -15,6 +15,7 @@ import {
 } from "recharts";
 
 const Guardian = () => {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [latestArticles, setLatestArticles] = useState([]);
   const [showAllArticles, setShowAllArticles] = useState(false);
   const [guardianData, setGuardianData] = useState({
@@ -181,23 +182,44 @@ const Guardian = () => {
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 p-4 md:p-8">
-      <nav className="flex items-center justify-between text-lg mb-6">
+      <nav className="flex items-center justify-between text-lg mb-6 relative">
         <div>
           <a href="https://www.theguardian.com/us">
             <img src="/guardian/The-Guardian-logo.png" alt="The Guardian Logo" className="h-24 block dark:hidden" />
             <img src="/guardian/The-Guardian-logo-white.png" alt="The Guardian Logo (White)" className="h-24 hidden dark:block" />
           </a>
         </div>
-        <ul className="flex flex-row list-none p-2 justify-center m-0 space-x-6">
-          <li><a href="" className="text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Home</a></li>
-          <li><a href="#overview" className="text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Overview</a></li>
-          <li><a href="#sentiment" className="text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Sentiment Analysis</a></li>
-          <li><a href="#article" className="text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Article Analysis</a></li>
-          <li><a href="#word" className="text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Word Analysis</a></li>
-          <li><a href="#list" className="text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Recent Article</a></li>
+
+        {/* Hamburger Icon */}
+        <button
+          className="lg:hidden text-gray-700 dark:text-gray-300 focus:outline-none"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                  d={menuOpen
+                    ? "M6 18L18 6M6 6l12 12"  // X icon
+                    : "M4 6h16M4 12h16M4 18h16" // Hamburger icon
+                  } />
+          </svg>
+        </button>
+
+        {/* Menu Items */}
+        <ul 
+          className={`${
+            menuOpen ? 'block' : 'hidden'
+          } absolute top-24 left-0 w-full text-right rounded-lg bg-gray-200 dark:bg-gray-700 lg:static lg:flex lg:flex-row lg:space-x-6 lg:items-center lg:w-auto lg:bg-transparent lg:dark:bg-transparent list-none p-2 m-0 transition-all z-50`}
+        >
+          <li><a href="/" className="block py-2 text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Home</a></li>
+          <li><a href="#overview" className="block py-2 text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Overview</a></li>
+          <li><a href="#sentiment" className="block py-2 text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Sentiment Analysis</a></li>
+          <li><a href="#article" className="block py-2 text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Article Analysis</a></li>
+          <li><a href="#word" className="block py-2 text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Word Analysis</a></li>
+          <li><a href="#list" className="block py-2 text-gray-700 dark:text-gray-300 font-bold hover:text-xl transition-all">Recent Article</a></li>
         </ul>
       </nav>
 
+      <main className="relative z-10">
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white text-center mb-6">
         The Guardian Sentiment Dashboard
       </h1>
@@ -468,7 +490,7 @@ const Guardian = () => {
         </div>
       )}
     </div>
-
+    </main>
     </div>
   );
 };

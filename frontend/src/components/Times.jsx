@@ -54,7 +54,7 @@ function App() {
   // ========== 3) KEYWORDS ==========
   const [keywords, setKeywords] = useState(null);
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/api/sentiment/keyword")
+    fetch("http://127.0.0.1:5000/api/keyword")
       .then((res) => res.json())
       .then((data) => {
         setKeywords(data);

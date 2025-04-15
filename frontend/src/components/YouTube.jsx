@@ -24,7 +24,6 @@ import {
 import { TagCloud } from "react-tagcloud"
 import Loading from "./ui/Loading"
 
-
 function YouTube() {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState({
@@ -212,7 +211,7 @@ function YouTube() {
   };
 
   const fetchData = () => {
-    fetch("http://127.0.0.1:8000/videos/")
+    fetch("http://127.0.0.1:8000/youtube/")
       .then((response) => response.json())
       .then((data) => {
         const { results, metrics } = data;
@@ -638,4 +637,4 @@ function MetricCard({ title, value }) {
   )
 }
 
-export default YouTube;
+export default YouTube

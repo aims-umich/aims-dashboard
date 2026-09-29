@@ -10,6 +10,7 @@
 #   caffeinate -i deploy/oci-wait-for-capacity.sh  # keep the Mac awake and retry until it launches
 #
 # Settings (environment variables, all optional):
+#   SHAPE           instance shape                        (VM.Standard.A1.Flex)
 #   DISPLAY_NAME    instance name                         (aims-dashboard-prod)
 #   SHAPE_CONFIGS   "OCPUS:GB" pairs, most preferred first ("1:6 1:4")
 #   VCN_NAME        VCN whose public subnet to use        (aims-dashboard-vcn)
@@ -23,7 +24,7 @@
 # Works with the macOS system bash (3.2) and jq.
 set -euo pipefail
 
-SHAPE=VM.Standard.A1.Flex
+SHAPE=${SHAPE:-VM.Standard.A1.Flex}
 DISPLAY_NAME=${DISPLAY_NAME:-aims-dashboard-prod}
 SHAPE_CONFIGS=${SHAPE_CONFIGS:-"1:6 1:4"}
 VCN_NAME=${VCN_NAME:-aims-dashboard-vcn}

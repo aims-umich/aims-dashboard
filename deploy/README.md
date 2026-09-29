@@ -33,6 +33,11 @@ Steps marked **(you)** need an account login or a decision, so only a person can
    - If creation fails with "Out of host capacity" (common for free A1), let `deploy/oci-wait-for-capacity.sh` retry for you.
      It checks each availability domain with Oracle's capacity report and launches with these same settings once one has room.
      Run `deploy/oci-wait-for-capacity.sh --dry-run` first, then `caffeinate -i deploy/oci-wait-for-capacity.sh`.
+     What worked on 2026-09-29, when Chicago had no A1 capacity at all: launch the same VM as A2.Flex (which had
+     capacity; this uses trial credit for a few minutes), then change its shape right away:
+     `SHAPE=VM.Standard.A2.Flex SHAPE_CONFIGS=1:6 MAX_HOURS=0 deploy/oci-wait-for-capacity.sh`, then
+     `oci compute instance update --instance-id <ocid> --shape VM.Standard.A1.Flex --shape-config '{"ocpus": 1, "memoryInGBs": 6}' --force`.
+     Confirm the result reports `VM.Standard.A1.Flex` (processor "Ampere Altra").
 3. Make the public IP stable: **Networking → IP management → Reserved public IPs**, reserve one, and attach it to the instance's VNIC.
    The DNS record points at this address.
 4. Open the web ports: **Networking → Virtual cloud networks → your VCN → Security Lists → Default** and add ingress rules for source `0.0.0.0/0`:

@@ -70,8 +70,8 @@ services:
     image: caddy:2-alpine
     profiles: [public]
     environment:
-      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
-      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      API_DOMAIN: ${API_DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

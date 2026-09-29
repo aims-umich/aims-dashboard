@@ -11,7 +11,8 @@ if [ -n "$tag" ]; then
   if grep -q '^IMAGE_TAG=' .env; then sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${tag}/" .env; else echo "IMAGE_TAG=${tag}" >> .env; fi
 fi
 
-docker compose --profile public pull --quiet
-docker compose --profile public up -d --remove-orphans --wait --wait-timeout 300
+# COMPOSE_PROFILES=public in .env adds Caddy on the machine that serves the public API.
+docker compose pull --quiet
+docker compose up -d --remove-orphans --wait --wait-timeout 300
 docker image prune -f >/dev/null
-docker compose --profile public ps
+docker compose ps

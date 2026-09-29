@@ -31,6 +31,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["sentiment*"]
 
+[tool.setuptools.package-data]
+sentiment = ["migrations/*.py", "migrations/*.mako", "migrations/versions/*.py"]
+
 [tool.ruff]
 line-length = 110
 target-version = "py312"
@@ -49,7 +52,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106"]
+"tests/**" = ["S105", "S106", "S603"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -10,8 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN useradd --system --uid 10001 --create-home app
 WORKDIR /app
-COPY pyproject.toml constraints.txt alembic.ini ./
-COPY migrations ./migrations
+COPY pyproject.toml constraints.txt ./
 COPY sentiment ./sentiment
 RUN pip install -c constraints.txt .
 USER app

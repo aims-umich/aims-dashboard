@@ -13,6 +13,8 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool, ConnectionPool
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+# Shipped inside the package so migrations work the same from a checkout and from an installed wheel.
+MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
 # Channel the ingest service notifies after inserting scorable segments.
 NEW_SEGMENTS_CHANNEL = "new_segments"
@@ -56,6 +58,7 @@ def migrate(database_url: str, revision: str = "head") -> None:
     from alembic import command
     from alembic.config import Config
 
-    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR))
     config.attributes["database_url"] = database_url
     command.upgrade(config, revision)

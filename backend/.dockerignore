@@ -2,7 +2,5 @@
 *
 !pyproject.toml
 !constraints.txt
-!alembic.ini
-!migrations/
 !sentiment/
 **/__pycache__

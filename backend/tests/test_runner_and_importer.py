@@ -180,3 +180,20 @@ def test_gpt_meta_commentary_is_stripped_from_legacy_summaries():
     assert (
         clean_gpt_summary("Summary: The text discusses a new reactor.") == "The text discusses a new reactor."
     )
+
+
+def test_migrations_ship_inside_the_package(tmp_path):
+    """The container installs a wheel, not a checkout, so migrations must travel with the package."""
+    import subprocess
+    import sys
+    import zipfile
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parent.parent
+    subprocess.run(
+        [sys.executable, "-m", "pip", "wheel", "--no-deps", "-q", "-w", str(tmp_path), str(backend)],
+        check=True,
+    )
+    names = zipfile.ZipFile(next(tmp_path.glob("sentiment-*.whl"))).namelist()
+    assert "sentiment/migrations/env.py" in names
+    assert "sentiment/migrations/versions/0001_initial_schema.py" in names

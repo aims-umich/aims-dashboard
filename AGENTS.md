@@ -23,7 +23,7 @@ It began as a UROP Symposium demo (tagged `v0-local-demo`) and was rebuilt in Se
   - `api/` - read-only FastAPI (`/api/v1/...`, `/healthz`).
   - `text.py` - cleanup, sentence splitting, language checks, and the nuclear-energy relevance rules.
   - `importer/legacy.py` - one-time import of the old SQLite/CSV data.
-  - `migrations/` - Alembic migrations, written as raw SQL.
+  - `migrations/` - Alembic migrations (inside the package), written as raw SQL.
   - `tests/` - pytest against a real Postgres (`TEST_DATABASE_URL`).
 - `frontend/` - React 19 + Vite + Tailwind 4 + Recharts. `src/pages/PlatformPage.jsx` is one data-driven page for every platform, configured in `src/lib/platforms.js`. Playwright E2E is in `e2e/`.
 - `compose.yaml` - Postgres, migrate, ingest, scorer, api, and Caddy (profile `public`).

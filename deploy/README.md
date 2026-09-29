@@ -30,7 +30,9 @@ Steps marked **(you)** need an account login or a decision, so only a person can
    - Networking: create a new VCN with a public subnet, and assign a public IPv4 address.
    - SSH keys: upload your public key.
    - Boot volume: 100 GB (the free allowance is 200 GB in total).
-   - If creation fails with "Out of host capacity", retry later or try another availability domain.
+   - If creation fails with "Out of host capacity" (common for free A1), let `deploy/oci-wait-for-capacity.sh` retry for you.
+     It checks each availability domain with Oracle's capacity report and launches with these same settings once one has room.
+     Run `deploy/oci-wait-for-capacity.sh --dry-run` first, then `caffeinate -i deploy/oci-wait-for-capacity.sh`.
 3. Make the public IP stable: **Networking → IP management → Reserved public IPs**, reserve one, and attach it to the instance's VNIC.
    The DNS record points at this address.
 4. Open the web ports: **Networking → Virtual cloud networks → your VCN → Security Lists → Default** and add ingress rules for source `0.0.0.0/0`:

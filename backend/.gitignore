@@ -176,4 +176,9 @@ cython_debug/
 # UROP specific
 *.csv
 *.db
-realtime.py
+realtime.py*.sqlite3
+*.parquet
+
+# Collected data never goes in git: it lives in Postgres and encrypted backups.
+# backend/posts.db held scraped Threads posts, which Meta's terms prohibit publishing.
+data/

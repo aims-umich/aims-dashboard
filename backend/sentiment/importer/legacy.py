@@ -14,6 +14,7 @@ import ast
 import csv
 import hashlib
 import logging
+import re
 import sqlite3
 from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime
@@ -175,13 +176,28 @@ def youtube_documents(csv_path: Path) -> Iterator[DocumentIn]:
         )
 
 
+# The old GPT step prefixed summaries with meta-commentary that itself contains the word "nuclear",
+# which would make every summary look relevant. Strip it so relevance is judged on the content.
+_GPT_META = re.compile(
+    r"\bSummary:\s*"
+    r"|The (?:text|article) is (?:not )?related to (?:the (?:keyword|topic)(?: of)? )?[\"“]?nuclear[.\"”]*\s*"
+    r"(?:as it |because it |since it )?",
+    re.IGNORECASE,
+)
+
+
+def clean_gpt_summary(value: str) -> str:
+    text = normalize(_GPT_META.sub(" ", value)).lstrip(" .,:;")
+    return text[:1].upper() + text[1:] if text else ""
+
+
 def nyt_documents(db_path: Path) -> Iterator[DocumentIn]:
     """The old NYT store only kept GPT-written summaries (no URL or headline); kept as-is and flagged."""
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
         for row in conn.execute("SELECT id, date, content FROM records"):
-            text = normalize(row["content"] or "").removeprefix("Summary:").strip()
+            text = clean_gpt_summary(row["content"] or "")
             if not text or not row["date"]:
                 continue
             yield DocumentIn(

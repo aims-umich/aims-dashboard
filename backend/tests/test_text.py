@@ -17,6 +17,7 @@ from sentiment.text import (
     [
         "Nuclear power is the cleanest energy we have.",
         "Vogtle unit 4 is finally online",
+        "The Palisades plant restart is on schedule",
         "SMRs could change the grid",
         "Big day for #NuclearPower in Michigan",
         "Fusion energy startups raised $2B this year",
@@ -46,6 +47,7 @@ def test_energy_texts_are_relevant(text):
         ("She works in nuclear medicine at the hospital.", "medicine"),
         ("Great weather today", "no_keyword"),
         ("jazz fusion night downtown", "no_keyword"),
+        ("Fires spread through Pacific Palisades overnight", "no_keyword"),
         ("smr lol", "no_keyword"),
     ],
 )

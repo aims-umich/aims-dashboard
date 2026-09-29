@@ -165,3 +165,18 @@ def test_recompute_relevance_requeues_and_excludes(db, database_url):
     result = recompute_relevance(database_url)
     assert result == {"checked": 2, "changed": 2, "relevant->excluded": 1, "excluded->relevant": 1}
     assert recompute_relevance(database_url)["changed"] == 0
+
+
+def test_gpt_meta_commentary_is_stripped_from_legacy_summaries():
+    from sentiment.importer.legacy import clean_gpt_summary
+
+    assert clean_gpt_summary('The text is not related to "nuclear".') == ""
+    assert (
+        clean_gpt_summary(
+            'The text is related to the keyword "nuclear." It discusses larger nuclear families.'
+        )
+        == "It discusses larger nuclear families."
+    )
+    assert (
+        clean_gpt_summary("Summary: The text discusses a new reactor.") == "The text discusses a new reactor."
+    )

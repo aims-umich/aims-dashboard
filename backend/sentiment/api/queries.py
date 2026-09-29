@@ -257,7 +257,9 @@ def posts(
     # segments lazily, so the cost is proportional to the page size, not the table size.
     rows = conn.execute(
         """
-        SELECT d.id, d.kind, d.url, d.title, d.author_handle, d.body, d.published_at, d.metrics, d.origin,
+        SELECT d.id, d.kind, d.url, d.title, d.author_handle, d.published_at, d.metrics, d.origin,
+               COALESCE(d.body, (SELECT s.text FROM segments s WHERE s.document_id = d.id
+                                 AND s.relevance = 'relevant' ORDER BY s.ordinal LIMIT 1)) AS body,
                lbl.label, agg.p_neg, agg.p_neu, agg.p_pos, agg.segments,
                parent.title AS parent_title, parent.url AS parent_url
         FROM documents d

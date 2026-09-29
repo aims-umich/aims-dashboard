@@ -89,15 +89,20 @@ _FOREIGN_STOPWORDS = (
 _WORD = re.compile(r"[A-Za-zÀ-ɏ']+")
 
 
+def mostly_non_latin(text: str) -> bool:
+    letters = [c for c in text if c.isalpha()]
+    return bool(letters) and sum(c.isascii() for c in letters) / len(letters) < 0.6
+
+
 def is_english(text: str, declared: str | None = None) -> bool:
     """Trust a declared language tag when there is one; otherwise use a function-word heuristic.
 
     Text that is mostly in a non-Latin script is never English, whatever its tag says
     (bots and cross-posters often tag everything "en").
     """
-    letters = [c for c in text if c.isalpha()]
-    if letters and sum(c.isascii() for c in letters) / len(letters) < 0.6:
+    if mostly_non_latin(text):
         return False
+    letters = [c for c in text if c.isalpha()]
     if declared:
         return declared.lower().split("-")[0].split("_")[0] == "en"
     words = [w.lower() for w in _WORD.findall(text)]
@@ -131,7 +136,8 @@ _ANCHORS = re.compile(
     | \btokamaks?\b | \bstellarators?\b
     | \bspent\s+fuel\b | \bradioactive\s+waste\b | \byucca\s+mountain\b
     | \bchernobyl\b | \bfukushima\b | \bthree\s+mile\s+island\b | \bzaporizhzhia\b
-    | \bdiablo\s+canyon\b | \bvogtle\b | \bpalisades\b | \bindian\s+point\b
+    | \bdiablo\s+canyon\b | \bvogtle\b
+    | \b(?:palisades|indian\s+point)\s+(?:nuclear|plant|reactors?|power|restart)\b
     | \batomic\s+energy\b | \batomkraft\b
     """,
     re.IGNORECASE | re.VERBOSE,
@@ -209,7 +215,7 @@ def classify_relevance(text: str, *, lang: str | None = None, context_relevant: 
     if not text.strip():
         return Relevance(EXCLUDED, "empty")
     if not is_english(text, lang):
-        return Relevance(NON_ENGLISH, lang or "heuristic")
+        return Relevance(NON_ENGLISH, "script" if mostly_non_latin(text) else lang or "heuristic")
     if context_relevant:
         return Relevance(RELEVANT)
     text = text.replace("\u2019", "'")

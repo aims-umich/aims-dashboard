@@ -146,3 +146,22 @@ def test_threads_cannot_be_imported(legacy_dir):
 
     with pytest.raises(ValueError, match="Threads data is intentionally excluded"):
         documents_for("threads", default_paths(legacy_dir))
+
+
+def test_recompute_relevance_requeues_and_excludes(db, database_url):
+    from sentiment.maintenance import recompute_relevance
+
+    doc = db.execute(
+        "INSERT INTO documents (platform, external_id, kind, published_at)"
+        " VALUES ('mastodon', 'x', 'post', now()) RETURNING id"
+    ).fetchone()["id"]
+    db.execute(
+        "INSERT INTO segments (document_id, ordinal, text, relevance, relevance_reason) VALUES"
+        " (%s, 0, 'Iran nuclear talks resume', 'relevant', NULL),"
+        " (%s, 1, 'A new nuclear plant opens', 'excluded', 'no_keyword')",
+        (doc, doc),
+    )
+    assert recompute_relevance(database_url, dry_run=True)["changed"] == 2
+    result = recompute_relevance(database_url)
+    assert result == {"checked": 2, "changed": 2, "relevant->excluded": 1, "excluded->relevant": 1}
+    assert recompute_relevance(database_url)["changed"] == 0

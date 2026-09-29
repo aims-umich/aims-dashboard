@@ -34,6 +34,7 @@ ADULT_LABELS = frozenset({"porn", "sexual", "nudity", "graphic-media", "gore"})
 HIDE_LABELS = ADULT_LABELS | {"spam", "!hide", "!takedown", "!warn"}
 COMMIT_EVERY_S = 30.0
 STALL_AFTER_S = 90.0
+HEALTHY_SESSION_S = 60.0
 REWIND_US = 5_000_000  # Re-read 5 s on reconnect; upserts make the overlap harmless.
 
 
@@ -117,20 +118,71 @@ class BlueskyStreamJob(Job):
         heartbeat: Heartbeat,
         stopping: asyncio.Event,
     ) -> None:
+        """Consume Jetstream until stopped, reconnecting (and failing over) on drops.
+
+        Public Jetstream instances close connections every few minutes; that is normal, so a drop
+        after a healthy session reconnects at once from the saved cursor. Only repeated failures to
+        connect at all are raised to the runner (and counted against the job's health).
+        """
         urls = split_csv(self.settings.bluesky_jetstream_urls)
-        endpoint = urls[int(cursor.get("endpoint", 0)) % len(urls)]
-        time_us = cursor.get("time_us")
-        params = f"?wantedCollections={POST_COLLECTION}"
-        if time_us:
-            params += f"&cursor={int(time_us) - REWIND_US}"
+        state = {
+            "time_us": int(cursor["time_us"]) if cursor.get("time_us") else None,
+            "endpoint": int(cursor.get("endpoint", 0)) % len(urls),
+        }
         ssl_context = ssl.create_default_context(cafile=certifi.where())
+        failures = 0
+        while not stopping.is_set():
+            started = time.monotonic()
+            try:
+                await self._session(urls, state, ssl_context, commit, heartbeat, stopping)
+                return
+            except (OSError, websockets.WebSocketException) as exc:
+                healthy = time.monotonic() - started > HEALTHY_SESSION_S
+                failures = 0 if healthy else failures + 1
+                state["endpoint"] = (state["endpoint"] + (0 if healthy else 1)) % len(urls)
+                log.info(
+                    "jetstream disconnected",
+                    extra={
+                        "error": str(exc),
+                        "reconnect_failures": failures,
+                        "next": urls[state["endpoint"]],
+                    },
+                )
+                if failures >= len(urls):
+                    raise
+                await asyncio.sleep(min(2**failures, 30))
+
+    async def _session(
+        self,
+        urls: list[str],
+        state: dict[str, Any],
+        ssl_context: ssl.SSLContext,
+        commit: Callable[[PollResult], Awaitable[Any]],
+        heartbeat: Heartbeat,
+        stopping: asyncio.Event,
+    ) -> None:
+        endpoint = urls[state["endpoint"]]
+        params = f"?wantedCollections={POST_COLLECTION}"
+        if state["time_us"]:
+            params += f"&cursor={state['time_us'] - REWIND_US}"
         pending: list[DocumentIn] = []
         deletions: list[tuple[str, str]] = []
         seen = 0
+
+        async def flush() -> None:
+            nonlocal pending, deletions, seen
+            await commit(
+                PollResult(
+                    documents=pending,
+                    cursor={"time_us": state["time_us"], "endpoint": state["endpoint"]},
+                    fetched=seen,
+                    deletions=deletions,
+                )
+            )
+            pending, deletions, seen = [], [], 0
+
+        log.info("connecting to jetstream", extra={"endpoint": endpoint, "resume": bool(state["time_us"])})
         last_commit = last_message = time.monotonic()
-        last_time_us = int(time_us) if time_us else None
-        endpoint_index = urls.index(endpoint)
-        log.info("connecting to jetstream", extra={"endpoint": endpoint, "resume": bool(time_us)})
         try:
             async with websockets.connect(
                 endpoint + params, ssl=ssl_context, max_size=2**22, open_timeout=20, ping_interval=30
@@ -147,44 +199,20 @@ class BlueskyStreamJob(Job):
                     if message is not None:
                         event = json.loads(message)
                         seen += 1
-                        last_time_us = event.get("time_us", last_time_us)
+                        state["time_us"] = event.get("time_us", state["time_us"])
                         parsed = parse_event(event)
                         if isinstance(parsed, DocumentIn):
                             pending.append(parsed)
                         elif isinstance(parsed, tuple):
                             deletions.append(parsed)
                     if time.monotonic() - last_commit >= COMMIT_EVERY_S:
-                        await commit(
-                            PollResult(
-                                documents=pending,
-                                cursor={"time_us": last_time_us, "endpoint": endpoint_index},
-                                fetched=seen,
-                                deletions=deletions,
-                            )
-                        )
+                        await flush()
                         await heartbeat.ping()
-                        pending, deletions, seen = [], [], 0
                         last_commit = time.monotonic()
-        except (OSError, websockets.WebSocketException):
-            # Fail over to the next public Jetstream instance on the next attempt.
-            await commit(
-                PollResult(
-                    documents=pending,
-                    cursor={"time_us": last_time_us, "endpoint": endpoint_index + 1},
-                    fetched=seen,
-                    deletions=deletions,
-                )
-            )
-            raise
-        if pending or deletions:
-            await commit(
-                PollResult(
-                    documents=pending,
-                    cursor={"time_us": last_time_us, "endpoint": endpoint_index},
-                    fetched=seen,
-                    deletions=deletions,
-                )
-            )
+        finally:
+            # Whatever happened, keep what was read and the cursor that goes with it.
+            if pending or deletions or seen:
+                await flush()
 
 
 class BlueskyMetricsJob(Job):

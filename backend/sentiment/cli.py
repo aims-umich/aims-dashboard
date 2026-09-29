@@ -44,6 +44,12 @@ def cmd_import_legacy(args: argparse.Namespace) -> None:
         print(json.dumps({"source": source, **totals}))
 
 
+def cmd_relevance(args: argparse.Namespace) -> None:
+    from sentiment.maintenance import recompute_relevance
+
+    print(json.dumps(recompute_relevance(get_settings().database_url, dry_run=args.dry_run)))
+
+
 def cmd_models(args: argparse.Namespace) -> None:
     with connect(get_settings().database_url) as conn:
         if args.action == "activate":
@@ -82,6 +88,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--backend-dir", default=str(BACKEND_DIR), help="folder holding the old collector data"
     )
     legacy.set_defaults(func=cmd_import_legacy)
+
+    relevance = sub.add_parser("relevance", help="re-apply the relevance rules to stored segments")
+    relevance.add_argument("--dry-run", action="store_true", help="only report what would change")
+    relevance.set_defaults(func=cmd_relevance)
 
     models = sub.add_parser("models", help="list models, or choose which one the dashboard shows")
     models.add_argument("action", choices=["list", "activate"])

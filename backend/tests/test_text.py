@@ -22,6 +22,7 @@ from sentiment.text import (
         "Fusion energy startups raised $2B this year",
         "Nuclear weapons and nuclear power are different things.",
         "Chernobyl still shapes how people see reactors",
+        "Iran restarts the Bushehr nuclear power plant after repairs",
     ],
 )
 def test_energy_texts_are_relevant(text):
@@ -35,6 +36,12 @@ def test_energy_texts_are_relevant(text):
         ("He went nuclear on his coworkers.", "idiom"),
         ("My nuclear family went to the beach.", "idiom"),
         ("Iran's nuclear program is advancing, officials said.", "weapons"),
+        ("Iran’s Araghchi Meets Qatari Mediators Amid US Nuclear Stance", "geopolitics"),
+        ("Iran Pressed to Make Nuclear Concessions to Revive Peace Talks With U.S.", "geopolitics"),
+        (
+            "Trump suggests an endgame regarding Iran, stating 'Let them hit us with a nuclear weapon'",
+            "weapons+geopolitics",
+        ),
         ("A nuclear war would end civilization.", "weapons"),
         ("She works in nuclear medicine at the hospital.", "medicine"),
         ("Great weather today", "no_keyword"),
@@ -54,6 +61,7 @@ def test_declared_language_wins_and_heuristic_catches_undeclared():
     assert is_english("Nuclear power plant closed today in Michigan after a long fight")
     assert is_english("#nuclear #smr")
     assert not is_english("原子力発電所")
+    assert not is_english("福島の旅館・リゾート、10月3連休の予約 #fukushima #nuclear", declared="en")
 
 
 def test_context_relevant_only_needs_english():

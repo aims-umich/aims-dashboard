@@ -194,8 +194,15 @@ _MENTION = re.compile(r"@\w[\w.\-]*")
 
 
 def tokenize(text: str) -> list[str]:
-    text = _MENTION.sub(" ", _URL.sub(" ", text.lower()))
-    return [t.strip("'-") for t in _TOKEN.findall(text) if t.strip("'-") not in _STOPWORDS]
+    text = _MENTION.sub(" ", _URL.sub(" ", text.lower().replace("\u2019", "'")))
+    tokens = []
+    for raw in _TOKEN.findall(text):
+        token = raw.strip("'-").removesuffix("'s")
+        # Contractions carry no topic, and nuclear* hashtags are what every post was collected by.
+        if "'" in token or token.startswith("nuclear") or token in _STOPWORDS or len(token) < 3:
+            continue
+        tokens.append(token)
+    return tokens
 
 
 def words(conn: psycopg.Connection, platform: Platform, range_key: str, sample: int = 5000) -> dict[str, Any]:
@@ -222,7 +229,7 @@ def words(conn: psycopg.Connection, platform: Platform, range_key: str, sample: 
             LABELS[label]: [{"word": w, "count": c} for w, c in counter.most_common(15)]
             for label, counter in by_label.items()
         },
-        "cloud": [{"value": w, "count": c} for w, c in overall.most_common(60)],
+        "cloud": [{"value": w, "count": c} for w, c in overall.most_common(45)],
     }
 
 

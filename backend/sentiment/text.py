@@ -90,7 +90,14 @@ _WORD = re.compile(r"[A-Za-zÀ-ɏ']+")
 
 
 def is_english(text: str, declared: str | None = None) -> bool:
-    """Trust a declared language tag when there is one; otherwise use a function-word heuristic."""
+    """Trust a declared language tag when there is one; otherwise use a function-word heuristic.
+
+    Text that is mostly in a non-Latin script is never English, whatever its tag says
+    (bots and cross-posters often tag everything "en").
+    """
+    letters = [c for c in text if c.isalpha()]
+    if letters and sum(c.isascii() for c in letters) / len(letters) < 0.6:
+        return False
     if declared:
         return declared.lower().split("-")[0].split("_")[0] == "en"
     words = [w.lower() for w in _WORD.findall(text)]
@@ -103,7 +110,6 @@ def is_english(text: str, declared: str | None = None) -> bool:
     if english / len(words) >= 0.12:
         return True
     # Few function words at all: accept short Latin-script text such as headlines and hashtags.
-    letters = [c for c in text if c.isalpha()]
     return len(words) <= 12 and sum(c.isascii() for c in letters) / len(letters) > 0.97
 
 
@@ -167,6 +173,18 @@ _EXCLUSIONS: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 
+# In texts about these actors, a bare "nuclear" almost always means weapons or diplomacy.
+_GEOPOLITICS = re.compile(
+    r"\b(?:iran|iranian|tehran|north\s+korea|north\s+korean|pyongyang|kim\s+jong|hezbollah|hormuz)\b",
+    re.IGNORECASE,
+)
+# Energy-specific terms that keep a geopolitical text relevant (such as Zaporizhzhia or Bushehr coverage).
+_ENERGY_ANCHORS = re.compile(
+    r"\bnuclear[-\s]+(?:power|energy|electricity|plants?|reactors?|stations?|industry|generation|fuel)\b"
+    r"|\bpower\s+(?:plants?|stations?)\b|\breactors?\b|\bnuclearpower\b|\bnuclearenergy\b",
+    re.IGNORECASE,
+)
+
 RELEVANT = "relevant"
 EXCLUDED = "excluded"
 NON_ENGLISH = "non_english"
@@ -194,6 +212,7 @@ def classify_relevance(text: str, *, lang: str | None = None, context_relevant: 
         return Relevance(NON_ENGLISH, lang or "heuristic")
     if context_relevant:
         return Relevance(RELEVANT)
+    text = text.replace("\u2019", "'")
     if not has_anchor(text):
         return Relevance(EXCLUDED, "no_keyword")
     remaining = text
@@ -202,6 +221,8 @@ def classify_relevance(text: str, *, lang: str | None = None, context_relevant: 
         remaining, count = pattern.subn(" ", remaining)
         if count:
             reasons.append(reason)
+    if _GEOPOLITICS.search(remaining) and not _ENERGY_ANCHORS.search(remaining):
+        return Relevance(EXCLUDED, "+".join([*reasons, "geopolitics"]))
     if has_anchor(remaining):
         return Relevance(RELEVANT)
     return Relevance(EXCLUDED, "+".join(reasons) or "no_keyword")

@@ -15,10 +15,10 @@ export const SidebarImpl = ({ children, open, setOpen, mobileOpen, setMobileOpen
   )
 }
 
-export const SidebarBody = (props) => (
+export const SidebarBody = ({ mobileActions, ...props }) => (
   <>
     <DesktopSidebar {...props} />
-    <MobileSidebar {...props} />
+    <MobileSidebar {...props} actions={mobileActions} />
   </>
 )
 
@@ -46,12 +46,14 @@ export const DesktopSidebar = ({ className, children }) => {
   )
 }
 
-export const MobileSidebar = ({ className, children }) => {
+export const MobileSidebar = ({ className, children, actions }) => {
   const { mobileOpen, setMobileOpen } = useSidebar()
   return (
-    <div className="fixed inset-x-0 top-0 z-30 flex h-12 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-800 md:hidden">
+    <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-800 md:hidden">
       <span className="text-sm font-semibold text-gray-900 dark:text-white">Nuclear Energy Sentiment</span>
-      <button
+      <div className="flex items-center gap-2">
+        {actions}
+        <button
         type="button"
         aria-label="Open menu"
         aria-expanded={mobileOpen}
@@ -59,7 +61,8 @@ export const MobileSidebar = ({ className, children }) => {
         className="rounded-md p-1.5 text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
       >
         <IconMenu2 size={22} />
-      </button>
+        </button>
+      </div>
       <AnimatePresence>
         {mobileOpen && (
           <motion.nav

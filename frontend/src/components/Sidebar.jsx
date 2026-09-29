@@ -5,7 +5,7 @@ import { useStatus } from "../lib/statusContext"
 import PlatformIcon from "./PlatformIcon"
 import { SidebarBody, SidebarImpl, SidebarLink } from "./ui/SidebarImpl"
 
-export function Sidebar({ children }) {
+export function Sidebar({ children, mobileActions }) {
   const [open, setOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { data } = useStatus()
@@ -20,7 +20,7 @@ export function Sidebar({ children }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <SidebarImpl open={open} setOpen={setOpen} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen}>
-        <SidebarBody className="justify-between gap-10">
+        <SidebarBody className="justify-between gap-10" mobileActions={mobileActions}>
           <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
             <SidebarLink
               link={{ label: "All dashboards", href: "/", icon: <Home size={20} className="text-gray-700 dark:text-gray-200" /> }}
@@ -46,7 +46,7 @@ export function Sidebar({ children }) {
           </div>
         </SidebarBody>
       </SidebarImpl>
-      <div className="pt-12 md:pl-16 md:pt-0">{children}</div>
+      <div className="pt-14 md:pl-16 md:pt-0">{children}</div>
     </div>
   )
 }

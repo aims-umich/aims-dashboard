@@ -26,20 +26,22 @@ const Layout = () => {
     }
   }, [darkMode])
 
+  const toggle = (
+    <button
+      type="button"
+      onClick={() => setDarkMode(!darkMode)}
+      className="rounded-lg bg-gray-200 p-2 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+      aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {darkMode ? <FiSun className="h-5 w-5" /> : <FiMoon className="h-5 w-5" />}
+    </button>
+  )
+
   return (
     <StatusProvider>
-      <Sidebar>
-        <div className="px-4 pb-12 pt-4 sm:px-6 lg:px-8">
-          <div className="mb-2 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setDarkMode(!darkMode)}
-              className="rounded-lg bg-gray-200 p-2 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {darkMode ? <FiSun className="h-5 w-5" /> : <FiMoon className="h-5 w-5" />}
-            </button>
-          </div>
+      <Sidebar mobileActions={toggle}>
+        <div className="px-4 pb-12 pt-5 sm:px-6 md:pt-4 lg:px-8">
+          <div className="mb-2 hidden justify-end md:flex">{toggle}</div>
           <main>
             <Outlet />
           </main>

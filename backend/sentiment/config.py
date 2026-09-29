@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     # API
     api_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     api_cache_ttl_s: float = 30.0
-    api_rate_limit_per_min: int = 300
+    api_rate_limit_per_min: int = 600
 
     @property
     def sources(self) -> list[str]:

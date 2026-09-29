@@ -131,8 +131,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         response = await call_next(request)
         if request.url.path.startswith("/api/v1/"):
-            # Let Vercel's edge and browsers reuse responses briefly.
-            response.headers.setdefault("Cache-Control", f"public, max-age={int(settings.api_cache_ttl_s)}")
+            # Let Vercel's edge and browsers reuse responses briefly, so load on the VM stays flat.
+            ttl = int(settings.api_cache_ttl_s)
+            response.headers.setdefault(
+                "Cache-Control", f"public, max-age={ttl}, s-maxage={ttl}, stale-while-revalidate={ttl * 2}"
+            )
         return response
 
     @contextmanager

@@ -206,4 +206,5 @@ def test_rate_limit_and_cache_headers(settings, seeded):
     settings.api_rate_limit_per_min = 300
     settings.api_cache_ttl_s = 30
     with TestClient(create_app(settings)) as client:
-        assert client.get("/api/v1/status").headers["cache-control"] == "public, max-age=30"
+        cache_control = client.get("/api/v1/status").headers["cache-control"]
+        assert cache_control == "public, max-age=30, s-maxage=30, stale-while-revalidate=60"

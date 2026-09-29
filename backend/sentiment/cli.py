@@ -50,6 +50,15 @@ def cmd_relevance(args: argparse.Namespace) -> None:
     print(json.dumps(recompute_relevance(get_settings().database_url, dry_run=args.dry_run)))
 
 
+def cmd_seed_demo(_: argparse.Namespace) -> None:
+    from sentiment.maintenance import seed_demo
+
+    settings = get_settings()
+    if settings.environment == "production":
+        sys.exit("Refusing to seed demo data into a production database.")
+    print(json.dumps(seed_demo(settings.database_url, settings.sources)))
+
+
 def cmd_models(args: argparse.Namespace) -> None:
     with connect(get_settings().database_url) as conn:
         if args.action == "activate":
@@ -92,6 +101,8 @@ def build_parser() -> argparse.ArgumentParser:
     relevance = sub.add_parser("relevance", help="re-apply the relevance rules to stored segments")
     relevance.add_argument("--dry-run", action="store_true", help="only report what would change")
     relevance.set_defaults(func=cmd_relevance)
+
+    sub.add_parser("seed-demo", help="fill a dev/CI database with fake data").set_defaults(func=cmd_seed_demo)
 
     models = sub.add_parser("models", help="list models, or choose which one the dashboard shows")
     models.add_argument("action", choices=["list", "activate"])

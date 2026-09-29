@@ -70,7 +70,8 @@ log "Availability domains: $(echo "$ads" | tr '\n' ' ')"
 
 existing=$(oci compute instance list --compartment-id "$COMPARTMENT_ID" --display-name "$DISPLAY_NAME" --all \
   | jq -r '[.data[]? | select(."lifecycle-state" != "TERMINATED" and ."lifecycle-state" != "TERMINATING")] | length')
-[ "$existing" = "0" ] || die "an instance named $DISPLAY_NAME already exists; nothing to do"
+# The CLI prints nothing at all when there are no instances, so empty output means zero.
+[ "${existing:-0}" = "0" ] || die "an instance named $DISPLAY_NAME already exists; nothing to do"
 
 if [ -z "${SUBNET_ID:-}" ]; then
   vcn_id=$(oci network vcn list --compartment-id "$COMPARTMENT_ID" --all \

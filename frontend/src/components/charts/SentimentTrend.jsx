@@ -9,7 +9,14 @@ import ChartTooltip from "./ChartTooltip"
 const MIN_FOR_SHARE = 3
 
 export default function SentimentTrend({ trend, bucket, unit }) {
-  const [mode, setMode] = useState("share")
+  // Shares only mean something when buckets hold several items; otherwise start on counts.
+  const [chosen, setMode] = useState(null)
+  const suggested = useMemo(() => {
+    const filled = trend.map((r) => r.positive + r.neutral + r.negative).filter((n) => n > 0)
+    const dense = filled.filter((n) => n >= MIN_FOR_SHARE).length
+    return filled.length && dense / filled.length >= 0.6 ? "share" : "count"
+  }, [trend])
+  const mode = chosen ?? suggested
   const data = useMemo(
     () =>
       trend.map((row) => {

@@ -41,4 +41,9 @@ export default [
       ],
     },
   },
+  {
+    // Playwright fixtures call a parameter named `use`, which is not a React hook.
+    files: ['e2e/**/*.js'],
+    rules: { 'react-hooks/rules-of-hooks': 'off' },
+  },
 ]

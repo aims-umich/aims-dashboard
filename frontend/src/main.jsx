@@ -1,30 +1,30 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './Layout';
-import App from './App';
-import Threads from './components/Threads'
-import Mastodon from './components/Mastodon'
-import Reddit from './components/Reddit'
-import YouTube from './components/YouTube'
-import Guardian from './components/Guardian'
-import Times from './components/Times'
-import './index.css';
+import React from "react"
+import ReactDOM from "react-dom/client"
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import "./index.css"
+import Layout from "./Layout"
+import { PLATFORMS } from "./lib/platforms"
+import About from "./pages/About"
+import Home from "./pages/Home"
+import NotFound from "./pages/NotFound"
+import PlatformPage from "./pages/PlatformPage"
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<App />} />
-          <Route path="/instagram" element={<Threads />} />
-          <Route path="/mastodon" element={<Mastodon />} />
-          <Route path="/reddit" element={<Reddit />} />
-          <Route path="/youtube" element={<YouTube />}/>
-          <Route path="/guardian" element={<Guardian />} />
-          <Route path="/times" element={<Times />} />
+          <Route path="/" element={<Home />} />
+          {Object.values(PLATFORMS).map((p) => (
+            <Route key={p.key} path={p.route} element={<PlatformPage key={p.key} platform={p.key} />} />
+          ))}
+          <Route path="/about" element={<About />} />
+          {/* Old URLs from the local demo. */}
+          <Route path="/times" element={<Navigate to="/nyt" replace />} />
+          <Route path="/instagram" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
     </BrowserRouter>
-  </React.StrictMode>
-);
+  </React.StrictMode>,
+)

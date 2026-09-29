@@ -1,121 +1,141 @@
-import { useState, createContext, useContext } from "react"
-import { Link } from "react-router-dom"
-import { AnimatePresence, motion } from "framer-motion"
 import { IconMenu2, IconX } from "@tabler/icons-react"
+import { AnimatePresence, motion } from "framer-motion"
+import { useEffect } from "react"
+import { NavLink, useLocation } from "react-router-dom"
 import { classNames } from "../../lib/utils"
+import { SidebarContext, useSidebar } from "./sidebarContext"
 
-const SidebarContext = createContext(undefined)
 
-export const useSidebar = () => {
-  const context = useContext(SidebarContext)
-  if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider.")
-  }
-  return context
-}
-
-export const SidebarProvider = ({ children, open: openProp, setOpen: setOpenProp, animate = true }) => {
-  const [openState, setOpenState] = useState(false)
-
-  const open = openProp !== undefined ? openProp : openState
-  const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState
-
-  return <SidebarContext.Provider value={{ open, setOpen, animate }}>{children}</SidebarContext.Provider>
-}
-
-export const SidebarImpl = ({ children, open, setOpen, animate }) => {
+export const SidebarImpl = ({ children, open, setOpen, mobileOpen, setMobileOpen }) => {
+  const location = useLocation()
+  // Close the mobile menu after navigating.
+  useEffect(() => setMobileOpen(false), [location.pathname, setMobileOpen])
   return (
-    <SidebarProvider open={open} setOpen={setOpen} animate={animate}>
-      {children}
-    </SidebarProvider>
+    <SidebarContext.Provider value={{ open, setOpen, mobileOpen, setMobileOpen }}>{children}</SidebarContext.Provider>
   )
 }
 
-export const SidebarBody = (props) => {
-  return (
-    <>
-      <DesktopSidebar {...props} />
-      <MobileSidebar {...props} />
-    </>
-  )
-}
+export const SidebarBody = (props) => (
+  <>
+    <DesktopSidebar {...props} />
+    <MobileSidebar {...props} />
+  </>
+)
 
-export const DesktopSidebar = ({ className, children, ...props }) => {
-  const { open, setOpen, animate } = useSidebar()
-  return (
-    <motion.div
-      className={classNames(
-        "fixed top-0 left-0 h-screen px-4 py-4 hidden md:flex md:flex-col bg-white dark:bg-gray-800 w-[300px] flex-shrink-0 border-r dark:border-gray-700 z-10",
-        className,
-      )}
-      animate={{
-        width: animate ? (open ? "300px" : "60px") : "300px",
-      }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      {...props}
-    >
-      {children}
-    </motion.div>
-  )
-}
-
-export const MobileSidebar = ({ className, children, ...props }) => {
+// Collapsed to icons; expands over the page on hover or keyboard focus without moving the content.
+export const DesktopSidebar = ({ className, children }) => {
   const { open, setOpen } = useSidebar()
   return (
-    <div
+    <motion.nav
+      aria-label="Dashboards"
       className={classNames(
-        "fixed top-0 left-0 right-0 h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-white dark:bg-gray-800 w-full border-b dark:border-gray-700 z-10",
+        "fixed top-0 left-0 z-30 hidden h-screen flex-col overflow-hidden border-r border-gray-200 bg-white px-3.5 py-4 dark:border-gray-700 dark:bg-gray-800 md:flex",
+        open && "shadow-xl",
         className,
       )}
-      {...props}
+      initial={false}
+      animate={{ width: open ? 256 : 64 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}
     >
-      <div className="flex justify-end z-20 w-full">
-        <IconMenu2 className="text-gray-800 dark:text-gray-200" onClick={() => setOpen(!open)} />
-      </div>
+      {children}
+    </motion.nav>
+  )
+}
+
+export const MobileSidebar = ({ className, children }) => {
+  const { mobileOpen, setMobileOpen } = useSidebar()
+  return (
+    <div className="fixed inset-x-0 top-0 z-30 flex h-12 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-800 md:hidden">
+      <span className="text-sm font-semibold text-gray-900 dark:text-white">Nuclear Energy Sentiment</span>
+      <button
+        type="button"
+        aria-label="Open menu"
+        aria-expanded={mobileOpen}
+        onClick={() => setMobileOpen(true)}
+        className="rounded-md p-1.5 text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+      >
+        <IconMenu2 size={22} />
+      </button>
       <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ x: "-100%", opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: "-100%", opacity: 0 }}
-            transition={{
-              duration: 0.3,
-              ease: "easeInOut",
-            }}
+        {mobileOpen && (
+          <motion.nav
+            aria-label="Dashboards"
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
             className={classNames(
-              "fixed h-full w-full inset-0 bg-white dark:bg-gray-800 p-10 z-[100] flex flex-col justify-between",
+              "fixed inset-0 z-50 flex h-full w-full flex-col justify-between bg-white p-6 dark:bg-gray-800",
               className,
             )}
           >
-            <div
-              className="absolute right-10 top-10 z-50 text-gray-800 dark:text-gray-200"
-              onClick={() => setOpen(!open)}
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setMobileOpen(false)}
+              className="absolute right-4 top-4 rounded-md p-1.5 text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
             >
-              <IconX />
-            </div>
+              <IconX size={22} />
+            </button>
             {children}
-          </motion.div>
+          </motion.nav>
         )}
       </AnimatePresence>
     </div>
   )
 }
 
-export const SidebarLink = ({ link, className, ...props }) => {
-  const { open, animate } = useSidebar()
-  return (
-    <Link to={link.href} className={classNames("flex items-center justify-start gap-2 py-2", className)} {...props}>
-      {link.icon}
-      <motion.span
-        animate={{
-          display: animate ? (open ? "inline-block" : "none") : "inline-block",
-          opacity: animate ? (open ? 1 : 0) : 1,
-        }}
-        className="text-gray-700 dark:text-gray-200 text-sm transition duration-150 whitespace-pre inline-block"
+export const SidebarLink = ({ link, className }) => {
+  const { open, mobileOpen } = useSidebar()
+  const expanded = open || mobileOpen
+  const label = (
+    <span
+      className={classNames(
+        "whitespace-pre transition-opacity duration-150",
+        expanded ? "opacity-100" : "pointer-events-none opacity-0",
+      )}
+    >
+      {link.label}
+    </span>
+  )
+  if (link.external) {
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={expanded ? undefined : link.label}
+        className={classNames(
+          "flex items-center gap-3 rounded-lg px-1.5 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/40",
+          className,
+        )}
       >
-        {link.label}
-      </motion.span>
-    </Link>
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center">{link.icon}</span>
+        {label}
+      </a>
+    )
+  }
+  return (
+    <NavLink
+      to={link.href}
+      end={link.href === "/"}
+      title={expanded ? undefined : link.label}
+      className={({ isActive }) =>
+        classNames(
+          "flex items-center gap-3 rounded-lg px-1.5 py-1.5 text-sm transition-colors",
+          isActive
+            ? "bg-gray-100 font-medium text-gray-900 dark:bg-gray-700/70 dark:text-white"
+            : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/40",
+          className,
+        )
+      }
+    >
+      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center">{link.icon}</span>
+      {label}
+    </NavLink>
   )
 }

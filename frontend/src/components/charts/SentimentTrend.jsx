@@ -6,6 +6,8 @@ import { Card, EmptyState } from "../ui/Card"
 import SegmentedControl from "../ui/SegmentedControl"
 import ChartTooltip from "./ChartTooltip"
 
+const MIN_FOR_SHARE = 3
+
 export default function SentimentTrend({ trend, bucket, unit }) {
   const [mode, setMode] = useState("share")
   const data = useMemo(
@@ -16,7 +18,8 @@ export default function SentimentTrend({ trend, bucket, unit }) {
         return {
           bucket: row.bucket,
           total,
-          ...Object.fromEntries(SENTIMENTS.map((s) => [s, total ? row[s] / total : null])),
+          // A share of one or two items is noise; leave those buckets as gaps.
+          ...Object.fromEntries(SENTIMENTS.map((s) => [s, total >= MIN_FOR_SHARE ? row[s] / total : null])),
         }
       }),
     [trend, mode],
@@ -27,7 +30,11 @@ export default function SentimentTrend({ trend, bucket, unit }) {
   return (
     <Card
       title="Sentiment over time"
-      subtitle={share ? `Share of scored ${unit} per ${bucket}` : `Scored ${unit} per ${bucket}`}
+      subtitle={
+        share
+          ? `Share of scored ${unit} per ${bucket} (gaps have fewer than ${MIN_FOR_SHARE})`
+          : `Scored ${unit} per ${bucket}`
+      }
       actions={
         <SegmentedControl
           label="Trend units"

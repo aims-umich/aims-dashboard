@@ -178,6 +178,8 @@ def test_status_reports_fresh_stale_error_and_pending(client):
 def test_platform_index_and_disabled_platforms(client):
     body = client.get("/api/v1/platforms").json()
     assert [p["platform"] for p in body["platforms"]] == ["bluesky", "mastodon", "youtube", "guardian", "nyt"]
+    mastodon = next(p for p in body["platforms"] if p["platform"] == "mastodon")
+    assert mastodon["totals"]["scored"] == 2 and mastodon["scored_all_time"] == 3
     assert client.get("/api/v1/platforms/reddit/summary").status_code == 404
     assert client.get("/api/v1/platforms/threads/summary").status_code == 404
     assert client.get("/api/v1/platforms/mastodon/summary", params={"range": "5y"}).status_code == 422

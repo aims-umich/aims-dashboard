@@ -223,6 +223,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             "name": platform.name,
                             "unit": platform.unit,
                             "totals": summary["totals"],
+                            "scored_all_time": queries.scored_count(conn, platform),
                             "sentiment": summary["sentiment"],
                             "net_sentiment": summary["net_sentiment"],
                             "status": status_by_platform[platform.key]["state"],

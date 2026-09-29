@@ -47,7 +47,8 @@ def active_model(conn: psycopg.Connection) -> dict[str, Any] | None:
 
 def summary(conn: psycopg.Connection, platform: Platform, range_key: str) -> dict[str, Any]:
     since, bucket = range_bounds(range_key)
-    params = _params(platform, since) | {"bucket": bucket}
+    # Bounded ranges show every bucket in the range; "all" starts at the first data point.
+    params = _params(platform, since) | {"bucket": bucket, "full_range": RANGES[range_key][0] is not None}
 
     totals = conn.execute(
         f"""
@@ -75,7 +76,10 @@ def summary(conn: psycopg.Connection, platform: Platform, range_key: str) -> dic
         buckets AS (
             SELECT generate_series(
                 date_trunc(
-                    %(bucket)s, GREATEST(%(since)s, COALESCE((SELECT min(bucket) FROM scored), now())), 'UTC'
+                    %(bucket)s,
+                    CASE WHEN %(full_range)s THEN %(since)s
+                         ELSE COALESCE((SELECT min(bucket) FROM scored), now()) END,
+                    'UTC'
                 ),
                 date_trunc(%(bucket)s, now(), 'UTC'),
                 ('1 ' || %(bucket)s)::interval
@@ -141,6 +145,12 @@ def summary(conn: psycopg.Connection, platform: Platform, range_key: str) -> dic
         "confidence": confidence_bins,
         "engagement": engagement,
     }
+
+
+def scored_count(conn: psycopg.Connection, platform: Platform) -> int:
+    since, _ = range_bounds("all")
+    row = conn.execute(f"SELECT count(*) AS n {SCORED_FROM}", _params(platform, since)).fetchone()
+    return row["n"]
 
 
 def _engagement(conn: psycopg.Connection, platform: Platform, params: dict[str, Any]) -> dict[str, Any]:

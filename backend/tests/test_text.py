@@ -24,6 +24,9 @@ from sentiment.text import (
         "Nuclear weapons and nuclear power are different things.",
         "Chernobyl still shapes how people see reactors",
         "Iran restarts the Bushehr nuclear power plant after repairs",
+        "China approves ten new reactors to cut coal use",
+        "The Race for Nuclear Fusion Is Heating Up #China #CleanEnergy",
+        "Treated water release from Fukushima Daiichi begins",
     ],
 )
 def test_energy_texts_are_relevant(text):
@@ -48,6 +51,9 @@ def test_energy_texts_are_relevant(text):
         ("Great weather today", "no_keyword"),
         ("jazz fusion night downtown", "no_keyword"),
         ("Fires spread through Pacific Palisades overnight", "no_keyword"),
+        ("Umineko Shouten In-store, Fukushima, Japan #Japan", "no_keyword"),
+        ("NATO condemned the nuclear rhetoric from Russia over Kaliningrad", "weapons+geopolitics"),
+        ("China expands its nuclear stockpile, the Pentagon says", "geopolitics"),
         ("smr lol", "no_keyword"),
     ],
 )

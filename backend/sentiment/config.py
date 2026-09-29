@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         "wss://jetstream2.us-west.bsky.network/subscribe"
     )
     bluesky_appview_url: str = "https://public.api.bsky.app"
-    bluesky_metrics_interval_s: int = 3600
+    bluesky_metrics_interval_s: int = 600
     bluesky_metrics_window_days: int = 7
 
     mastodon_instances: str = "mastodon.social"

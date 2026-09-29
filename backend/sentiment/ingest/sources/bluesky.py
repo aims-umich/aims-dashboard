@@ -216,7 +216,11 @@ class BlueskyStreamJob(Job):
 
 
 class BlueskyMetricsJob(Job):
-    """Refreshes engagement counts for recent posts and drops posts Bluesky has removed or labeled."""
+    """Refreshes engagement counts for recent posts and drops posts Bluesky has removed or labeled.
+
+    New posts are picked up on the next short cycle (so handles appear within minutes);
+    after that each post is refreshed about hourly until it leaves the window.
+    """
 
     name = "bluesky_metrics"
     platform = PLATFORM
@@ -233,6 +237,7 @@ class BlueskyMetricsJob(Job):
                     """
                     SELECT external_id FROM documents
                     WHERE platform = %s AND published_at > now() - make_interval(days => %s)
+                      AND (metrics_updated_at IS NULL OR metrics_updated_at < now() - interval '1 hour')
                     ORDER BY published_at DESC
                     """,
                     (PLATFORM, self.settings.bluesky_metrics_window_days),

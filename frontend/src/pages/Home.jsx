@@ -49,9 +49,14 @@ function PlatformCard({ config, summary, status, index }) {
             <dd className="mt-0.5 text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
               {summary ? formatNumber(scored) : "…"}
             </dd>
+            {summary && (
+              <dd className="text-xs text-gray-500 dark:text-gray-400">
+                {formatNumber(summary.scored_all_time)} all time
+              </dd>
+            )}
           </div>
           <div>
-            <dt className="text-xs text-gray-500 dark:text-gray-400">Net sentiment</dt>
+            <dt className="text-xs text-gray-500 dark:text-gray-400">Net sentiment, 30 days</dt>
             <dd className="mt-0.5 text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
               {summary ? formatSigned(summary.net_sentiment) : "…"}
             </dd>

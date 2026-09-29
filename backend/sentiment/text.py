@@ -135,7 +135,10 @@ _ANCHORS = re.compile(
     | \b(?:nuclear\s+)?fusion\s+(?:energy|power|reactors?|plants?|research|start-?ups?)\b
     | \btokamaks?\b | \bstellarators?\b
     | \bspent\s+fuel\b | \bradioactive\s+waste\b | \byucca\s+mountain\b
-    | \bchernobyl\b | \bfukushima\b | \bthree\s+mile\s+island\b | \bzaporizhzhia\b
+    | \bchernobyl\b | \bthree\s+mile\s+island\b
+    | \bfukushima\s+(?:daiichi|nuclear|disaster|plant|reactors?|meltdown|accident|radiation|
+                       treated\s+water|wastewater)\b
+    | \bzaporizhzhia\s+(?:nuclear|plant|npp|power|reactors?)\b
     | \bdiablo\s+canyon\b | \bvogtle\b
     | \b(?:palisades|indian\s+point)\s+(?:nuclear|plant|reactors?|power|restart)\b
     | \batomic\s+energy\b | \batomkraft\b
@@ -161,7 +164,8 @@ _EXCLUSIONS: list[tuple[str, re.Pattern[str]]] = [
             r"\b(?:non-?)?nuclear[-\s]+(?:weapons?|bombs?|war(?:fare|s)?|warheads?|missiles?|arsenals?|"
             r"strikes?|attacks?|submarines?|deterren(?:ce|t)s?|tests?|testing|threats?|"
             r"(?:non-?)?proliferation|disarmament|armed|capable|blackmail|escalation|"
-            r"annihilation|apocalypse|armageddon|triad|umbrella|posture|doctrine)\b"
+            r"annihilation|apocalypse|armageddon|triad|umbrella|posture|doctrine|rhetoric|saber-?rattling|"
+            r"sabre-?rattling|forces|powers|states?|club)\b"
             r"|\bnukes?\b(?!\s+plants?)"
             r"|\bnuclear\s+(?:program(?:me)?s?|deal|talks|negotiations|ambitions|sites?|facilities|"
             r"enrichment)\b(?=[^.]*\b(?:iran|tehran|north\s+korea|pyongyang|kim\s+jong)\b)"
@@ -179,15 +183,19 @@ _EXCLUSIONS: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 
-# In texts about these actors, a bare "nuclear" almost always means weapons or diplomacy.
+# In texts about these actors, a bare "nuclear" almost always means weapons or diplomacy;
+# only energy-specific terms keep such a text relevant.
 _GEOPOLITICS = re.compile(
-    r"\b(?:iran|iranian|tehran|north\s+korea|north\s+korean|pyongyang|kim\s+jong|hezbollah|hormuz)\b",
+    r"\b(?:iran|iranian|tehran|north\s+korea|north\s+korean|pyongyang|kim\s+jong|hezbollah|hormuz|"
+    r"russia|russian|kremlin|putin|moscow|nato|pentagon|israel|israeli|china|chinese|pakistan|india)\b",
     re.IGNORECASE,
 )
 # Energy-specific terms that keep a geopolitical text relevant (such as Zaporizhzhia or Bushehr coverage).
 _ENERGY_ANCHORS = re.compile(
     r"\bnuclear[-\s]+(?:power|energy|electricity|plants?|reactors?|stations?|industry|generation|fuel)\b"
-    r"|\bpower\s+(?:plants?|stations?)\b|\breactors?\b|\bnuclearpower\b|\bnuclearenergy\b",
+    r"|\bpower\s+(?:plants?|stations?)\b|\breactors?\b|\bnuclear(?:power|energy|fusion)\b"
+    r"|\b(?:nuclear\s+)?fusion\s+(?:energy|power|reactors?|plants?|research)\b|\bnuclear\s+fusion\b"
+    r"|\bfission\b|\bsmall\s+modular\b|(?-i:\bSMRs?\b)",
     re.IGNORECASE,
 )
 

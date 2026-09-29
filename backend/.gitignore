@@ -176,7 +176,8 @@ cython_debug/
 # UROP specific
 *.csv
 *.db
-realtime.py*.sqlite3
+realtime.py
+*.sqlite3
 *.parquet
 
 # Collected data never goes in git: it lives in Postgres and encrypted backups.

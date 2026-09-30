@@ -79,15 +79,13 @@ class Settings(BaseSettings):
 
     guardian_api_key: SecretStr | None = None
     guardian_section: str = "us-news"
-    guardian_query: str = (
-        '"nuclear power" OR "nuclear energy" OR "nuclear plant" OR "nuclear reactor" OR '
-        '"nuclear waste" OR "nuclear fusion" OR "small modular reactor" OR "nuclear industry" OR '
-        '"nuclear safety" OR "nuclear regulatory"'
-    )
+    # Broad on purpose: every article that says "nuclear", then our relevance rules keep the energy ones.
+    # (A long OR of quoted phrases silently returns nothing from the Content API.)
+    guardian_query: str = "nuclear"
     guardian_interval_s: int = 1800
 
     nyt_api_key: SecretStr | None = None
-    nyt_query: str = "nuclear energy OR nuclear power OR nuclear plant OR nuclear reactor"
+    nyt_query: str = "nuclear"
     nyt_interval_s: int = 3600
 
     # Scorer

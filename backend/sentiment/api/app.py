@@ -28,7 +28,8 @@ log = logging.getLogger(__name__)
 
 STALE_AFTER_INTERVALS = 3
 FAILING_AFTER = 3  # consecutive failed runs before a job counts as broken, however recent its last success
-SEVERITY = {"ok": 0, "pending": 1, "stale": 2, "error": 3}
+# A job that has not run yet does not outweigh a healthy one; only stale or failing jobs do.
+SEVERITY = {"pending": 0, "ok": 1, "stale": 2, "error": 3}
 RangeParam = Annotated[str, Query(pattern="^(7d|30d|90d|1y|all)$")]
 # "us" keeps only items the source itself classifies as about the United States (Guardian tags).
 RegionParam = Annotated[str | None, Query(pattern="^(us)$")]

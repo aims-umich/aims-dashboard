@@ -208,3 +208,13 @@ def test_rate_limit_and_cache_headers(settings, seeded):
     with TestClient(create_app(settings)) as client:
         cache_control = client.get("/api/v1/status").headers["cache-control"]
         assert cache_control == "public, max-age=30, s-maxage=30, stale-while-revalidate=60"
+
+
+def test_repeated_failures_mark_a_platform_broken_even_after_a_recent_success(client, seeded):
+    seeded.execute(
+        "INSERT INTO ingest_state (source, interval_s, last_success_at, consecutive_failures) VALUES"
+        " ('youtube', 1800, now(), 0), ('youtube_comments', 1800, now() - interval '5 minutes', 3)"
+    )
+    youtube = next(p for p in client.get("/api/v1/status").json()["platforms"] if p["platform"] == "youtube")
+    assert youtube["state"] == "error"
+    assert {j["job"]: j["state"] for j in youtube["jobs"]}["youtube_comments"] == "error"

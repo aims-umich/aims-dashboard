@@ -27,6 +27,8 @@ from sentiment.ingest.sources import JOBS_BY_SOURCE
 log = logging.getLogger(__name__)
 
 STALE_AFTER_INTERVALS = 3
+FAILING_AFTER = 3  # consecutive failed runs before a job counts as broken, however recent its last success
+SEVERITY = {"ok": 0, "pending": 1, "stale": 2, "error": 3}
 RangeParam = Annotated[str, Query(pattern="^(7d|30d|90d|1y|all)$")]
 # "us" keeps only items the source itself classifies as about the United States (Guardian tags).
 RegionParam = Annotated[str | None, Query(pattern="^(us)$")]
@@ -170,7 +172,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     continue
                 interval = timedelta(seconds=row["interval_s"] or 3600)
                 last_ok = row["last_success_at"]
-                if last_ok and now - last_ok <= interval * STALE_AFTER_INTERVALS:
+                if row["consecutive_failures"] >= FAILING_AFTER:
+                    job_state = "error"
+                elif last_ok and now - last_ok <= interval * STALE_AFTER_INTERVALS:
                     job_state = "ok"
                 elif last_ok is None and row["consecutive_failures"] == 0:
                     job_state = "pending"
@@ -189,11 +193,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     }
                 )
             primary = jobs[0] if jobs else {"state": "pending", "last_success_at": None}
+            # A platform is only as healthy as its least healthy job (YouTube needs search and comments).
+            worst = max((job["state"] for job in jobs), key=SEVERITY.__getitem__, default="pending")
             platforms.append(
                 {
                     "platform": platform.key,
                     "name": platform.name,
-                    "state": primary["state"],
+                    "state": worst,
                     "last_success_at": primary["last_success_at"],
                     "jobs": jobs,
                 }

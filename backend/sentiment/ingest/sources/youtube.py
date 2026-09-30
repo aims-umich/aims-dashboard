@@ -12,6 +12,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import httpx
+
 from sentiment.ingest.base import (
     DocumentIn,
     Job,
@@ -27,6 +29,18 @@ PLATFORM = "youtube"
 API = "https://www.googleapis.com/youtube/v3"
 FIRST_RUN_HOURS = 48
 MAX_COMMENT_PAGES = 3
+
+
+class UnavailableError(Exception):
+    """YouTube says this video's comments are off or the video is gone; skip it, keep going."""
+
+
+def _reasons(response: httpx.Response) -> set[str]:
+    try:
+        errors = (response.json().get("error") or {}).get("errors") or []
+    except ValueError:
+        return set()
+    return {str(e.get("reason")) for e in errors if isinstance(e, dict)}
 
 
 def seconds_until_quota_reset(now: datetime | None = None) -> float:
@@ -121,8 +135,13 @@ class _YouTubeJob(Job):
 
     async def _get(self, path: str, **params: Any) -> dict[str, Any]:
         response = await self.client.get(f"{API}/{path}", params={**params, "key": self._key()})
-        if response.status_code == 403 and "quotaExceeded" in response.text:
-            raise RateLimitedError(seconds_until_quota_reset(), "YouTube daily quota exceeded")
+        if response.status_code in (403, 404):
+            # Read the machine-readable reason; the human message is long and varies.
+            reasons = _reasons(response)
+            if reasons & {"quotaExceeded", "dailyLimitExceeded", "rateLimitExceeded"}:
+                raise RateLimitedError(seconds_until_quota_reset(), "YouTube daily quota exceeded")
+            if reasons & {"commentsDisabled", "videoNotFound", "forbidden"}:
+                raise UnavailableError(",".join(sorted(reasons)))
         raise_for_status(response)
         return response.json()
 
@@ -213,11 +232,9 @@ class YouTubeCommentsJob(_YouTubeJob):
                     if page_token:
                         params["pageToken"] = page_token
                     data = await self._get("commentThreads", **params)
-                except Exception as exc:
-                    if "commentsDisabled" in str(exc) or "HTTP 404" in str(exc):
-                        disabled.append(video_id)
-                        break
-                    raise
+                except UnavailableError:
+                    disabled.append(video_id)
+                    break
                 items = data.get("items", [])
                 fetched += len(items)
                 reached_seen = False

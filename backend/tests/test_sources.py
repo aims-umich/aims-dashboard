@@ -289,7 +289,27 @@ async def test_youtube_comments_only_new_and_skip_disabled(settings, client, poo
 
     def threads(request):
         if request.url.params["videoId"] == "vid2":
-            return httpx.Response(403, json={"error": {"errors": [{"reason": "commentsDisabled"}]}})
+            # YouTube's real shape: a long human message first, the machine-readable reason last.
+            message = (
+                'The video identified by the <code><a href="/youtube/v3/docs/commentThreads/list#videoId">'
+                "videoId</a></code> parameter has disabled comments."
+            )
+            return httpx.Response(
+                403,
+                json={
+                    "error": {
+                        "code": 403,
+                        "message": message,
+                        "errors": [
+                            {
+                                "message": message,
+                                "domain": "youtube.commentThread",
+                                "reason": "commentsDisabled",
+                            }
+                        ],
+                    }
+                },
+            )
         return httpx.Response(
             200,
             json={

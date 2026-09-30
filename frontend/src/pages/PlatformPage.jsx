@@ -17,7 +17,12 @@ import { usePlatformStatus } from "../lib/statusContext"
 import { useDocumentTitle } from "../lib/useDocumentTitle"
 import { usePolling } from "../lib/usePolling"
 
-function PageHeader({ config, status, range, onRange }) {
+const REGIONS = [
+  { value: "all", label: "All coverage" },
+  { value: "us", label: "U.S." },
+]
+
+function PageHeader({ config, status, range, onRange, region, onRegion }) {
   return (
     <header className="flex flex-col gap-4 border-b border-gray-200 pb-6 dark:border-gray-800 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0">
@@ -44,7 +49,12 @@ function PageHeader({ config, status, range, onRange }) {
           )}
         </div>
       </div>
-      <SegmentedControl label="Time range" value={range} onChange={onRange} options={RANGES} />
+      <div className="flex flex-wrap items-center gap-2 md:justify-end">
+        {config.regionFilter && (
+          <SegmentedControl label="Coverage" value={region} onChange={onRegion} options={REGIONS} />
+        )}
+        <SegmentedControl label="Time range" value={range} onChange={onRange} options={RANGES} />
+      </div>
     </header>
   )
 }
@@ -56,10 +66,17 @@ export default function PlatformPage({ platform }) {
   const [params, setParams] = useSearchParams()
   const requested = params.get("range")
   const range = RANGES.some((r) => r.value === requested) ? requested : config.defaultRange
-  const setRange = (value) =>
-    setParams(value === config.defaultRange ? {} : { range: value }, { replace: true, preventScrollReset: true })
+  const region = config.regionFilter && params.get("region") === "us" ? "us" : "all"
+  const updateParams = (next) => {
+    const merged = { range, region, ...next }
+    const query = {}
+    if (merged.range !== config.defaultRange) query.range = merged.range
+    if (merged.region !== "all") query.region = merged.region
+    setParams(query, { replace: true, preventScrollReset: true })
+  }
+  const regionQuery = region === "us" ? "&region=us" : ""
 
-  const { data, error } = usePolling(`/platforms/${platform}/summary?range=${range}`)
+  const { data, error } = usePolling(`/platforms/${platform}/summary?range=${range}${regionQuery}`)
   const unit = config.unitLabel
   const isArticle = platform === "guardian" || platform === "nyt"
   const loading = !data
@@ -67,7 +84,14 @@ export default function PlatformPage({ platform }) {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader config={config} status={status} range={range} onRange={setRange} />
+      <PageHeader
+        config={config}
+        status={status}
+        range={range}
+        onRange={(value) => updateParams({ range: value })}
+        region={region}
+        onRegion={(value) => updateParams({ region: value })}
+      />
 
       {error && (
         <div
@@ -138,11 +162,12 @@ export default function PlatformPage({ platform }) {
         </>
       )}
 
-      <WordPanels platform={platform} range={range} unit={unit} />
+      <WordPanels platform={platform} range={range} unit={unit} regionQuery={regionQuery} />
 
       <RecentPosts
         platform={platform}
         isArticle={isArticle}
+        regionQuery={regionQuery}
         fields={data?.engagement?.fields ?? []}
         title={isArticle ? "Recent articles" : `Recent ${unit}`}
         note={config.listNote}

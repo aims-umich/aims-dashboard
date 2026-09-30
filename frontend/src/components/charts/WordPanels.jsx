@@ -8,8 +8,8 @@ import { Card, EmptyState, Skeleton } from "../ui/Card"
 import SegmentedControl from "../ui/SegmentedControl"
 import ChartTooltip from "./ChartTooltip"
 
-export default function WordPanels({ platform, range, unit }) {
-  const { data, error } = usePolling(`/platforms/${platform}/words?range=${range}`, 300_000)
+export default function WordPanels({ platform, range, unit, regionQuery = "" }) {
+  const { data, error } = usePolling(`/platforms/${platform}/words?range=${range}${regionQuery}`, 300_000)
   const [tab, setTab] = useState("positive")
   const words = data?.[tab] ?? []
   // Alphabetical order keeps the cloud stable between polls instead of reshuffling it.

@@ -72,9 +72,9 @@ function PostRow({ item, fields, isArticle }) {
   )
 }
 
-export default function RecentPosts({ platform, fields, isArticle, title, note }) {
+export default function RecentPosts({ platform, fields, isArticle, title, note, regionQuery = "" }) {
   const [sentiment, setSentiment] = useState("all")
-  const query = `/platforms/${platform}/posts?limit=${PAGE}${sentiment === "all" ? "" : `&sentiment=${sentiment}`}`
+  const query = `/platforms/${platform}/posts?limit=${PAGE}${sentiment === "all" ? "" : `&sentiment=${sentiment}`}${regionQuery}`
   const { data, error } = usePolling(query)
   const [more, setMore] = useState({ items: [], cursor: undefined, loading: false })
 

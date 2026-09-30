@@ -90,7 +90,8 @@ def guardian_documents(db_path: Path) -> Iterator[DocumentIn]:
                 lang="en",
                 segments=[SegmentIn(s, classify_relevance(s, lang="en")) for s in sentences],
                 metrics={"word_count": _int(row["word_count"])} if _int(row["word_count"]) else {},
-                raw={"section": row["section"]},
+                # The old collector only searched the US news section.
+                raw={"section": row["section"], "us": True},
                 origin="backfill",
             )
     finally:

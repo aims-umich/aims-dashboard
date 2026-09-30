@@ -27,6 +27,7 @@ SCORED_FROM = """
     JOIN predictions p ON p.segment_id = s.id
          AND p.model_id = (SELECT id FROM models WHERE is_active)
     WHERE d.platform = %(platform)s AND d.kind = ANY(%(kinds)s) AND d.published_at >= %(since)s
+      AND (NOT %(us_only)s OR d.raw->>'us' = 'true')
 """
 
 
@@ -37,18 +38,28 @@ def range_bounds(range_key: str, now: datetime | None = None) -> tuple[datetime,
     return since, bucket
 
 
-def _params(platform: Platform, since: datetime) -> dict[str, Any]:
-    return {"platform": platform.key, "kinds": list(platform.scored_kinds), "since": since}
+def _params(platform: Platform, since: datetime, us_only: bool = False) -> dict[str, Any]:
+    return {
+        "platform": platform.key,
+        "kinds": list(platform.scored_kinds),
+        "since": since,
+        "us_only": us_only,
+    }
 
 
 def active_model(conn: psycopg.Connection) -> dict[str, Any] | None:
     return conn.execute("SELECT id, name, revision, backend FROM models WHERE is_active").fetchone()
 
 
-def summary(conn: psycopg.Connection, platform: Platform, range_key: str) -> dict[str, Any]:
+def summary(
+    conn: psycopg.Connection, platform: Platform, range_key: str, us_only: bool = False
+) -> dict[str, Any]:
     since, bucket = range_bounds(range_key)
     # Bounded ranges show every bucket in the range; "all" starts at the first data point.
-    params = _params(platform, since) | {"bucket": bucket, "full_range": RANGES[range_key][0] is not None}
+    params = _params(platform, since, us_only) | {
+        "bucket": bucket,
+        "full_range": RANGES[range_key][0] is not None,
+    }
 
     totals = conn.execute(
         f"""
@@ -160,7 +171,7 @@ def _engagement(conn: psycopg.Connection, platform: Platform, params: dict[str, 
     doc_filter = """
         FROM documents d
         WHERE d.platform = %(platform)s AND d.kind = ANY(%(kinds)s) AND d.published_at >= %(since)s
-          AND d.metrics <> '{}'::jsonb
+          AND d.metrics <> '{}'::jsonb AND (NOT %(us_only)s OR d.raw->>'us' = 'true')
     """
     row = conn.execute(f"SELECT count(*) AS documents, {averages_sql} {doc_filter}", params).fetchone()
     trend = conn.execute(
@@ -215,14 +226,16 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-def words(conn: psycopg.Connection, platform: Platform, range_key: str, sample: int = 5000) -> dict[str, Any]:
+def words(
+    conn: psycopg.Connection, platform: Platform, range_key: str, sample: int = 5000, us_only: bool = False
+) -> dict[str, Any]:
     since, _ = range_bounds(range_key)
     rows = conn.execute(
         f"""
         SELECT s.text, p.label {SCORED_FROM} AND s.text <> ''
         ORDER BY d.published_at DESC LIMIT %(sample)s
         """,
-        _params(platform, since) | {"sample": sample},
+        _params(platform, since, us_only) | {"sample": sample},
     ).fetchall()
     by_label: dict[int, Counter[str]] = {0: Counter(), 1: Counter(), 2: Counter()}
     overall: Counter[str] = Counter()
@@ -250,6 +263,7 @@ def posts(
     limit: int,
     before: tuple[datetime, int] | None,
     sentiment: str | None,
+    us_only: bool = False,
 ) -> dict[str, Any]:
     """Recent scored documents, newest first, with a document-level sentiment.
 
@@ -262,6 +276,7 @@ def posts(
         "before_ts": before[0] if before else None,
         "before_id": before[1] if before else None,
         "label": LABELS.index(sentiment) if sentiment else None,
+        "us_only": us_only,
     }
     # Walk documents newest-first on the (platform, published_at) index and aggregate each one's
     # segments lazily, so the cost is proportional to the page size, not the table size.
@@ -285,6 +300,7 @@ def posts(
         ) lbl
         LEFT JOIN documents parent ON parent.id = d.parent_id
         WHERE d.platform = %(platform)s AND d.kind = ANY(%(kinds)s) AND d.text_purged_at IS NULL
+          AND (NOT %(us_only)s OR d.raw->>'us' = 'true')
           -- Bluesky posts are listed only once the metrics job has checked the author's opt-outs.
           AND (d.platform <> 'bluesky' OR d.metrics_updated_at IS NOT NULL)
           AND (%(before_ts)s::timestamptz IS NULL

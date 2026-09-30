@@ -187,6 +187,16 @@ def test_guardian_scores_nuclear_sentences_only():
     ]
     assert doc.body == "A short standfirst."
     assert doc.metrics == {"word_count": 812}
+    assert doc.raw == {"section": "US news", "us": True}
+
+
+def test_guardian_tags_us_articles_from_other_sections():
+    from sentiment.ingest.sources.guardian import is_about_us
+
+    tagged = f.guardian_result("environment/2026/x", "nuclear") | {"sectionId": "environment"}
+    tagged["tags"] = [{"id": "environment/nuclear-power"}, {"id": "world/usa"}]
+    untagged = f.guardian_result("environment/2026/y", "nuclear") | {"sectionId": "environment", "tags": []}
+    assert is_about_us(tagged) and not is_about_us(untagged)
 
 
 @respx.mock
@@ -209,7 +219,8 @@ async def test_guardian_pages_and_keeps_newest_cursor(settings, client, pool):
     result = await GuardianJob(settings, client, pool).poll({"latest": "2026-09-27T00:00:00+00:00"})
     first = route.calls[0].request.url.params
     assert first["from-date"] == "2026-09-26"
-    assert first["section"] == "us-news"
+    assert "section" not in first  # every section; US articles are tagged instead
+    assert first["show-tags"] == "keyword"
     assert first["api-key"] == "guardian-secret"
     assert [d.external_id for d in result.documents] == ["a/1", "a/2"]
     assert result.cursor == {"latest": "2026-09-28T10:00:00+00:00"}

@@ -28,6 +28,8 @@ log = logging.getLogger(__name__)
 
 STALE_AFTER_INTERVALS = 3
 RangeParam = Annotated[str, Query(pattern="^(7d|30d|90d|1y|all)$")]
+# "us" keeps only items the source itself classifies as about the United States (Guardian tags).
+RegionParam = Annotated[str | None, Query(pattern="^(us)$")]
 
 
 class TTLCache:
@@ -238,24 +240,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return cache.get_or_set(f"platforms:{range}", compute)
 
     @app.get("/api/v1/platforms/{key}/summary")
-    def summary(key: str, range: RangeParam = "all") -> dict[str, Any]:
+    def summary(key: str, range: RangeParam = "all", region: RegionParam = None) -> dict[str, Any]:
         platform = platform_or_404(key)
+        us = region == "us"
 
         def compute() -> dict[str, Any]:
             with db() as conn:
-                return queries.summary(conn, platform, range) | {"name": platform.name, "unit": platform.unit}
+                return queries.summary(conn, platform, range, us) | {
+                    "name": platform.name,
+                    "unit": platform.unit,
+                }
 
-        return cache.get_or_set(f"summary:{key}:{range}", compute)
+        return cache.get_or_set(f"summary:{key}:{range}:{region}", compute)
 
     @app.get("/api/v1/platforms/{key}/words")
-    def words(key: str, range: RangeParam = "all") -> dict[str, Any]:
+    def words(key: str, range: RangeParam = "all", region: RegionParam = None) -> dict[str, Any]:
         platform = platform_or_404(key)
 
         def compute() -> dict[str, Any]:
             with db() as conn:
-                return queries.words(conn, platform, range)
+                return queries.words(conn, platform, range, us_only=region == "us")
 
-        return cache.get_or_set(f"words:{key}:{range}", compute)
+        return cache.get_or_set(f"words:{key}:{range}:{region}", compute)
 
     @app.get("/api/v1/platforms/{key}/posts")
     def posts(
@@ -263,6 +269,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
         before: Annotated[str | None, Query(max_length=64)] = None,
         sentiment: Annotated[str | None, Query(pattern="^(negative|neutral|positive)$")] = None,
+        region: RegionParam = None,
     ) -> dict[str, Any]:
         platform = platform_or_404(key)
         cursor = None
@@ -275,9 +282,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         def compute() -> dict[str, Any]:
             with db() as conn:
-                return queries.posts(conn, platform, limit=limit, before=cursor, sentiment=sentiment)
+                return queries.posts(
+                    conn, platform, limit=limit, before=cursor, sentiment=sentiment, us_only=region == "us"
+                )
 
-        return cache.get_or_set(f"posts:{key}:{limit}:{before}:{sentiment}", compute)
+        return cache.get_or_set(f"posts:{key}:{limit}:{before}:{sentiment}:{region}", compute)
 
     return app
 

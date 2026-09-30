@@ -29,6 +29,16 @@ MAX_PAGES = 10
 FIRST_RUN_DAYS = 3
 
 
+def is_about_us(result: dict[str, Any]) -> bool:
+    """The Guardian's own classification: the US news section, or a US tag on an article elsewhere."""
+    if result.get("sectionId") == "us-news":
+        return True
+    return any(
+        tag.get("id") == "world/usa" or str(tag.get("id", "")).startswith("us-news/")
+        for tag in result.get("tags") or []
+    )
+
+
 def parse_result(result: dict[str, Any]) -> DocumentIn | None:
     if result.get("type") not in (None, "article"):
         return None
@@ -49,7 +59,7 @@ def parse_result(result: dict[str, Any]) -> DocumentIn | None:
         lang="en",
         segments=segments,
         metrics={"word_count": int(word_count)} if str(word_count or "").isdigit() else {},
-        raw={"section": result.get("sectionName")},
+        raw={"section": result.get("sectionName"), "us": is_about_us(result)},
     )
 
 
@@ -84,6 +94,7 @@ class GuardianJob(Job):
             "order-by": "newest",
             "page-size": PAGE_SIZE,
             "show-fields": "bodyText,byline,wordcount,trailText",
+            "show-tags": "keyword",
             "api-key": key,
         }
         if self.settings.guardian_section:

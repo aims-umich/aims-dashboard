@@ -80,7 +80,8 @@ class Settings(BaseSettings):
     reddit_compliance_interval_s: int = 86400
 
     guardian_api_key: SecretStr | None = None
-    guardian_section: str = "us-news"
+    # Empty = every section. Articles about the United States are tagged (raw.us) and can be filtered.
+    guardian_section: str = ""
     # Broad on purpose: every article that says "nuclear", then our relevance rules keep the energy ones.
     # (A long OR of quoted phrases silently returns nothing from the Content API.)
     guardian_query: str = "nuclear"

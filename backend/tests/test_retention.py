@@ -128,3 +128,28 @@ async def test_nyt_archive_backfill_keeps_nuclear_articles_and_replaces_legacy(
     assert rows == [
         {"external_id": "nyt://article/n1", "origin": "backfill", "title": "Palisades Plant Restarts"}
     ]
+
+
+async def test_region_filter_keeps_only_us_articles(settings, pool, db):
+    body = "A good new nuclear plant was approved."
+    us = parse_result(f.guardian_result("us-news/a", body, date=datetime.now(UTC).isoformat()))
+    uk = parse_result(
+        f.guardian_result("environment/b", body, date=datetime.now(UTC).isoformat())
+        | {"sectionId": "environment"}
+    )
+    async with pool.connection() as conn, conn.transaction():
+        await store.save_documents(conn, [us, uk])
+    clf = FakeClassifier()
+    model = register_model(db, clf.info)
+    while score_batch(db, clf, model, 10):
+        pass
+    settings.enabled_sources = "guardian"
+    with TestClient(create_app(settings)) as api:
+        everything = api.get("/api/v1/platforms/guardian/summary").json()["totals"]["documents"]
+        us_only = api.get("/api/v1/platforms/guardian/summary", params={"region": "us"}).json()["totals"][
+            "documents"
+        ]
+        posts = api.get("/api/v1/platforms/guardian/posts", params={"region": "us"}).json()["items"]
+        assert (everything, us_only) == (2, 1)
+        assert [p["title"] for p in posts] == ["Title for us-news/a"]
+        assert api.get("/api/v1/platforms/guardian/summary", params={"region": "uk"}).status_code == 422

@@ -58,9 +58,10 @@ export const PLATFORMS = {
     defaultRange: "all",
     name: "The Guardian",
     route: "/guardian",
-    tagline: "British daily newspaper, US edition",
+    tagline: "British daily newspaper",
     description:
-      "US news articles about nuclear power from The Guardian's Content API. Each sentence that mentions nuclear energy is scored on its own.",
+      "Articles about nuclear power from every section of The Guardian's Content API. Each sentence that mentions nuclear energy is scored on its own; articles the Guardian tags as U.S. coverage can be shown on their own.",
+    regionFilter: true,
     cadence: "Every 30 minutes",
     gradient: "from-emerald-500 to-teal-600",
     accent: "#052962",

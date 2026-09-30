@@ -1,0 +1,9 @@
+[Unit]
+Description=Encrypted nightly backup of the dashboard database
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=__USER__
+ExecStart=/opt/dashboard/deploy/backup.sh

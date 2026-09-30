@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the dashboard backup nightly
+
+[Timer]
+OnCalendar=*-*-* 07:30:00 UTC
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

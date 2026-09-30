@@ -1,0 +1,32 @@
+# HTTPS for the read API. Caddy obtains and renews the Let's Encrypt certificate itself.
+# No ACME email: Let's Encrypt does not need one, and Caddy renews certificates on its own.
+{
+	servers {
+		# Vercel's proxy sends the viewer's address in X-Forwarded-For. The API only uses it to
+		# share its rate limit fairly between viewers, so trusting it from any source is acceptable.
+		trusted_proxies static 0.0.0.0/0 ::/0
+	}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	@api path /api/* /healthz
+	handle @api {
+		reverse_proxy api:8000
+	}
+	handle {
+		respond "Not found" 404
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	log {
+		output stdout
+		format json
+	}
+}

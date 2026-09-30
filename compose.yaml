@@ -1,0 +1,91 @@
+# The whole backend on one machine: Postgres, migrations, collectors, scorer, read API, and Caddy.
+# The same file runs locally (`docker compose up --build`) and on the Oracle VM (images from GHCR).
+# Configuration comes from `.env` next to this file (see deploy/env.example).
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+x-app: &app
+  image: ${IMAGE_REPO:-ghcr.io/aims-umich/aims-dashboard}:${IMAGE_TAG:-latest}
+  build: { context: ./backend, target: app }
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://dashboard:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/dashboard
+  restart: unless-stopped
+  logging: *logging
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dashboard
+      POSTGRES_USER: dashboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=50", "-c", "log_min_duration_statement=2000"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dashboard -d dashboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    shm_size: 256mb
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *app
+    command: ["migrate"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  ingest:
+    <<: *app
+    command: ["ingest"]
+    stop_grace_period: 30s
+
+  scorer:
+    <<: *app
+    image: ${IMAGE_REPO:-ghcr.io/aims-umich/aims-dashboard}-scorer:${IMAGE_TAG:-latest}
+    build: { context: ./backend, target: scorer }
+    command: ["scorer"]
+    stop_grace_period: 30s
+    mem_limit: 3g
+    # BERT will happily take the whole core. Cap it and lower its priority so SSH, the API,
+    # Postgres, and the collectors stay responsive during a backfill (measured on the 1-OCPU VM).
+    cpus: ${SCORER_CPUS:-0.85}
+    cpu_shares: 256
+
+  api:
+    <<: *app
+    command: ["api"]
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Public HTTPS entry point. Only started where DNS points at the machine: `--profile public`.
+  caddy:
+    image: caddy:2-alpine
+    profiles: [public]
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-localhost}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

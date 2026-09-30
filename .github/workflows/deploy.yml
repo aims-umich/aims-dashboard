@@ -1,0 +1,103 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing image tag (a commit SHA) to redeploy, for a rollback. Empty builds HEAD.
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: ${{ !inputs.tag }}
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: ci
+    if: ${{ !inputs.tag }}
+    runs-on: ubuntu-24.04-arm # Native arm64 for the Oracle Ampere VM; free for public repositories.
+    permissions: { contents: read, packages: write }
+    outputs:
+      tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - id: repo
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          target: app
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.repo.outputs.image }}:${{ github.sha }},${{ steps.repo.outputs.image }}:latest
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          target: scorer
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.repo.outputs.image }}-scorer:${{ github.sha }},${{ steps.repo.outputs.image }}-scorer:latest
+          cache-from: type=gha,scope=scorer
+          cache-to: type=gha,scope=scorer,mode=max
+
+  staging:
+    needs: build
+    if: ${{ always() && vars.STAGING_ENABLED == 'true' && (needs.build.result == 'success' || inputs.tag) }}
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions: { contents: read, packages: read }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy-vm
+        with:
+          tag: ${{ inputs.tag || needs.build.outputs.tag }}
+          host: ${{ secrets.VM_HOST }}
+          user: ${{ secrets.VM_USER }}
+          ssh-key: ${{ secrets.VM_SSH_KEY }}
+          known-hosts: ${{ secrets.VM_KNOWN_HOSTS }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+
+  production:
+    needs: [build, staging]
+    # Opt-in: set the repository variable PRODUCTION_ENABLED=true once the production environment's
+    # secrets exist. Runs after staging succeeds (or is disabled). Add a required reviewer to the
+    # "production" environment to make it wait for a manual approval.
+    if: >-
+      ${{ always() && vars.PRODUCTION_ENABLED == 'true'
+          && (needs.build.result == 'success' || inputs.tag) && needs.staging.result != 'failure' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://dashboard.aims-umich.com
+    permissions: { contents: read, packages: read }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy-vm
+        with:
+          tag: ${{ inputs.tag || needs.build.outputs.tag }}
+          host: ${{ secrets.VM_HOST }}
+          user: ${{ secrets.VM_USER }}
+          ssh-key: ${{ secrets.VM_SSH_KEY }}
+          known-hosts: ${{ secrets.VM_KNOWN_HOSTS }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Public health check
+        run: |
+          for _ in $(seq 20); do
+            curl -fsS https://api.dashboard.aims-umich.com/healthz && exit 0
+            sleep 6
+          done
+          exit 1

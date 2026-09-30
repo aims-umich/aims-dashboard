@@ -1,0 +1,36 @@
+name: Deploy to a VM
+description: Copy the compose stack to /opt/dashboard on the VM over SSH and roll it to an image tag.
+inputs:
+  tag: { description: Image tag to run, required: true }
+  host: { description: VM address, required: true }
+  user: { description: SSH user, required: true }
+  ssh-key: { description: Private deploy key, required: true }
+  known-hosts: { description: The VM's pinned host key line(s), required: true }
+  registry-token: { description: Token that can read the GHCR images, required: true }
+runs:
+  using: composite
+  steps:
+    - name: Configure SSH
+      shell: bash
+      env: { KEY: "${{ inputs.ssh-key }}", KNOWN: "${{ inputs.known-hosts }}" }
+      run: |
+        install -m 700 -d ~/.ssh
+        printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+        printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts
+    - name: Copy the stack definition
+      shell: bash
+      env: { TARGET: "${{ inputs.user }}@${{ inputs.host }}" }
+      run: |
+        scp -p -i ~/.ssh/deploy_key -r compose.yaml deploy "$TARGET:/opt/dashboard/"
+    - name: Pull and restart
+      shell: bash
+      env:
+        TARGET: "${{ inputs.user }}@${{ inputs.host }}"
+        TAG: "${{ inputs.tag }}"
+        TOKEN: "${{ inputs.registry-token }}"
+        ACTOR: "${{ github.actor }}"
+      run: |
+        # The token is passed on stdin, never on a command line or in the environment of the VM.
+        printf '%s' "$TOKEN" | ssh -i ~/.ssh/deploy_key "$TARGET" "docker login ghcr.io -u '$ACTOR' --password-stdin >/dev/null"
+        ssh -i ~/.ssh/deploy_key "$TARGET" "/opt/dashboard/deploy/deploy.sh '$TAG' && curl -fsS http://127.0.0.1:8000/healthz"
+        ssh -i ~/.ssh/deploy_key "$TARGET" "docker logout ghcr.io >/dev/null"

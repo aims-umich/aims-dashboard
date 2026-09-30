@@ -1,0 +1,6 @@
+# Only the package, migrations, and build metadata go into the image.
+*
+!pyproject.toml
+!constraints.txt
+!sentiment/
+**/__pycache__

@@ -3,7 +3,7 @@
 #   target "app"    -> api and ingest (no ML runtime, small)
 #   target "scorer" -> adds CPU-only PyTorch and the pinned model weights, baked in at build time
 
-FROM python:3.12-slim-bookworm AS app
+FROM python:3.14-slim-bookworm AS app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \

@@ -37,6 +37,11 @@ function PageHeader({ config, status, range, onRange }) {
           <FreshnessBadge status={status} />
           <span>Collected: {config.cadence}</span>
           {config.credit && <span>Original dashboard by {config.credit}</span>}
+          {config.attribution && (
+            <a href={config.attribution.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
+              {config.attribution.text}
+            </a>
+          )}
         </div>
       </div>
       <SegmentedControl label="Time range" value={range} onChange={onRange} options={RANGES} />

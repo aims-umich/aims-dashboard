@@ -65,6 +65,7 @@ export const PLATFORMS = {
     gradient: "from-emerald-500 to-teal-600",
     accent: "#052962",
     chartColor: "#4B7BC8",
+    attribution: { text: "Powered by the Guardian", href: "https://open-platform.theguardian.com/" },
     logo: { light: "/guardian/The-Guardian-logo.png", dark: "/guardian/The-Guardian-logo-white.png" },
     unitLabel: "sentences",
   },
@@ -80,6 +81,7 @@ export const PLATFORMS = {
     gradient: "from-slate-600 to-slate-800",
     accent: "#121212",
     chartColor: "#9CA3AF",
+    attribution: { text: "Data provided by The New York Times", href: "https://developer.nytimes.com/" },
     unitLabel: "articles",
   },
 }

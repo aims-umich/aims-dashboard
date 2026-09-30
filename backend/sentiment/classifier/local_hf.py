@@ -10,7 +10,9 @@ log = logging.getLogger(__name__)
 
 
 class LocalHFClassifier:
-    def __init__(self, checkpoint: str, *, revision: str, max_length: int = 512, threads: int = 1) -> None:
+    def __init__(
+        self, checkpoint: str, *, revision: str, max_length: int = 512, threads: int = 1, micro_batch: int = 1
+    ) -> None:
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -21,10 +23,19 @@ class LocalHFClassifier:
         self._model.eval()
         self._order = canonical_order(self._model.config.id2label)
         self._max_length = max_length
+        # On a CPU core, padding a batch to its longest text costs more than batching saves:
+        # measured on the 1-OCPU Ampere VM, 1 text per forward pass scored 2.3x faster than 32.
+        self._micro_batch = max(1, micro_batch)
         self.info = ModelInfo(name=checkpoint, revision=revision, backend="local_hf")
         log.info("classifier loaded", extra={"model": checkpoint, "revision": revision, "threads": threads})
 
     def predict(self, texts: list[str]) -> list[tuple[float, float, float]]:
+        results: list[tuple[float, float, float]] = []
+        for start in range(0, len(texts), self._micro_batch):
+            results.extend(self._forward(texts[start : start + self._micro_batch]))
+        return results
+
+    def _forward(self, texts: list[str]) -> list[tuple[float, float, float]]:
         if not texts:
             return []
         torch = self._torch

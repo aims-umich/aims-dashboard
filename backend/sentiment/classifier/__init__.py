@@ -20,6 +20,7 @@ def build_classifier(settings: Settings) -> Classifier:
             revision=settings.scorer_revision,
             max_length=settings.scorer_max_length,
             threads=settings.scorer_threads,
+            micro_batch=settings.scorer_micro_batch,
         )
     if backend == "modal":
         from sentiment.classifier.remote import RemoteClassifier

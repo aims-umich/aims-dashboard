@@ -88,7 +88,9 @@ class Settings(BaseSettings):
     scorer_backend: str = "local_hf"
     scorer_model: str = "kumo24/bert-sentiment-nuclear"
     scorer_revision: str = "883de0dd5f6a1a4a4a5f9e5af9b54863ca44cd57"
-    scorer_batch_size: int = 32
+    # Segments claimed (and committed) per transaction, and texts per model forward pass.
+    scorer_batch_size: int = 16
+    scorer_micro_batch: int = 1
     scorer_threads: int = 1
     scorer_max_length: int = 512
     scorer_poll_interval_s: float = 30.0

@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build the app image (the scorer image is built on deploy)
         uses: docker/build-push-action@v6
         with:

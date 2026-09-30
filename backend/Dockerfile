@@ -3,7 +3,7 @@
 #   target "app"    -> api and ingest (no ML runtime, small)
 #   target "scorer" -> adds CPU-only PyTorch and the pinned model weights, baked in at build time
 
-FROM python:3.12-slim-bookworm AS app
+FROM python:3.14-slim-bookworm AS app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -18,8 +18,8 @@ ENTRYPOINT ["sentiment"]
 
 FROM app AS scorer
 USER root
-RUN pip install -c constraints.txt torch --index-url https://download.pytorch.org/whl/cpu \
- && pip install -c constraints.txt ".[scorer]"
+COPY scripts/install-scorer-deps.sh ./scripts/
+RUN sh scripts/install-scorer-deps.sh
 ARG SCORER_MODEL=kumo24/bert-sentiment-nuclear
 ARG SCORER_REVISION=883de0dd5f6a1a4a4a5f9e5af9b54863ca44cd57
 ENV HF_HOME=/opt/hf

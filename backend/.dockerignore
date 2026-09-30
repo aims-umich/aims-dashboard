@@ -3,4 +3,5 @@
 !pyproject.toml
 !constraints.txt
 !sentiment/
+!scripts/
 **/__pycache__

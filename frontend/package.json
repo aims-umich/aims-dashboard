@@ -11,20 +11,20 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@tabler/icons-react": "^3.31.0",
-    "@tailwindcss/vite": "^4.0.6",
+    "@tabler/icons-react": "^3.48.0",
+    "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",
     "framer-motion": "^12.4.10",
     "lucide-react": "^0.477.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "react-icons": "^5.4.0",
     "react-router-dom": "^7.2.0",
     "react-social-icons": "^6.22.0",
     "react-tagcloud": "^2.3.3",
     "recharts": "^2.15.1",
     "tailwind-merge": "^3.0.2",
-    "tailwindcss": "^4.0.6",
+    "tailwindcss": "^4.3.3",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
@@ -33,12 +33,18 @@
     "@types/node": "^22.13.9",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^9.19.0",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "globals": "^15.14.0",
-    "vite": "^6.1.0"
+    "vite": "^8.3.1"
+  },
+  "overrides": {
+    "react-social-icons": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
   }
 }

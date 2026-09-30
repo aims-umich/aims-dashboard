@@ -54,6 +54,10 @@ services:
     command: ["scorer"]
     stop_grace_period: 30s
     mem_limit: 3g
+    # BERT will happily take the whole core. Cap it and lower its priority so SSH, the API,
+    # Postgres, and the collectors stay responsive during a backfill (measured on the 1-OCPU VM).
+    cpus: ${SCORER_CPUS:-0.85}
+    cpu_shares: 256
 
   api:
     <<: *app

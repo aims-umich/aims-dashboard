@@ -190,6 +190,17 @@ def test_guardian_scores_nuclear_sentences_only():
     assert doc.raw == {"section": "US news", "us": True}
 
 
+def test_guardian_drops_articles_that_are_not_about_energy():
+    body = "It was a tense final. He hit a nuclear forehand to win the match. The crowd cheered."
+    result = f.guardian_result("sport/2026/sep/27/laver-cup", body) | {
+        "webTitle": "Zverev clinches Laver Cup"
+    }
+    doc = parse_result(result)
+    assert [(s.text, s.relevance.reason) for s in doc.segments] == [
+        ("He hit a nuclear forehand to win the match.", "off_topic_article")
+    ]
+
+
 def test_guardian_tags_us_articles_from_other_sections():
     from sentiment.ingest.sources.guardian import is_about_us
 

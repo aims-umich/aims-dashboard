@@ -21,7 +21,7 @@ from sentiment.ingest.base import (
     SourceDisabledError,
     raise_for_status,
 )
-from sentiment.text import RELEVANT, classify_relevance, has_anchor, normalize
+from sentiment.text import classify_with_headline, has_anchor, normalize
 
 PLATFORM = "nyt"
 SEARCH_URL = "https://api.nytimes.com/svc/search/v2/articlesearch.json"
@@ -50,10 +50,7 @@ def parse_doc(doc: dict[str, Any]) -> DocumentIn | None:
     text = " ".join(parts)
     if not text:
         return None
-    relevance = classify_relevance(text, lang="en")
-    if relevance.status != RELEVANT and headline:
-        # The abstract often omits the keyword the headline carries; judge them together.
-        relevance = classify_relevance(f"{headline}. {text}", lang="en")
+    relevance = classify_with_headline(text, headline)
     byline = (doc.get("byline") or {}).get("original")
     return DocumentIn(
         platform=PLATFORM,

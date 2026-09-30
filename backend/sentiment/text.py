@@ -199,6 +199,10 @@ _ENERGY_ANCHORS = re.compile(
     re.IGNORECASE,
 )
 
+# Raw language-model output posted by automated accounts (reasoning blocks and chat-template tokens).
+# These are not people's opinions, whatever they say about nuclear energy.
+_MACHINE_OUTPUT = re.compile(r"<\s*/?\s*think\s*>|<\|im_(?:start|end)\|>", re.IGNORECASE)
+
 RELEVANT = "relevant"
 EXCLUDED = "excluded"
 NON_ENGLISH = "non_english"
@@ -210,18 +214,51 @@ class Relevance:
     reason: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ArticleContext:
+    """What a whole article is about, for judging one of its sentences.
+
+    A lone sentence can use "nuclear" as a metaphor ("a nuclear forehand") or a name ("Nuclear Blast
+    Records"), or lean on an earlier sentence for its subject ("talks on the nuclear programme").
+    """
+
+    about_energy: bool
+    geopolitical: bool
+
+
 def has_anchor(text: str) -> bool:
     return bool(_ANCHORS.search(text))
 
 
-def classify_relevance(text: str, *, lang: str | None = None, context_relevant: bool = False) -> Relevance:
+def article_context(title: str | None, standfirst: str | None, sentences: list[str]) -> ArticleContext:
+    """An article counts as nuclear-energy coverage only if an energy-specific term appears somewhere in it.
+
+    It is geopolitical when its headline or standfirst is about states and diplomacy rather than energy.
+    """
+    head = f"{title or ''}. {standfirst or ''}".replace("’", "'")
+    return ArticleContext(
+        about_energy=any(_ENERGY_ANCHORS.search(t.replace("’", "'")) for t in [head, *sentences]),
+        geopolitical=bool(_GEOPOLITICS.search(head)) and not _ENERGY_ANCHORS.search(head),
+    )
+
+
+def classify_relevance(
+    text: str,
+    *,
+    lang: str | None = None,
+    context_relevant: bool = False,
+    article: ArticleContext | None = None,
+) -> Relevance:
     """Decide whether a segment should be scored.
 
     `context_relevant` is for texts whose topic comes from their parent, such as a YouTube
     comment on a nuclear-energy video: they only need to be English.
+    `article` is for one sentence of a longer article, judged together with the rest of it.
     """
     if not text.strip():
         return Relevance(EXCLUDED, "empty")
+    if _MACHINE_OUTPUT.search(text):
+        return Relevance(EXCLUDED, "machine_output")
     if not is_english(text, lang):
         return Relevance(NON_ENGLISH, "script" if mostly_non_latin(text) else lang or "heuristic")
     if context_relevant:
@@ -235,7 +272,10 @@ def classify_relevance(text: str, *, lang: str | None = None, context_relevant: 
         remaining, count = pattern.subn(" ", remaining)
         if count:
             reasons.append(reason)
-    if _GEOPOLITICS.search(remaining) and not _ENERGY_ANCHORS.search(remaining):
+    if article is not None and not article.about_energy:
+        return Relevance(EXCLUDED, "+".join([*reasons, "off_topic_article"]))
+    geopolitical = bool(_GEOPOLITICS.search(remaining)) or (article is not None and article.geopolitical)
+    if geopolitical and not _ENERGY_ANCHORS.search(remaining):
         return Relevance(EXCLUDED, "+".join([*reasons, "geopolitics"]))
     if has_anchor(remaining):
         return Relevance(RELEVANT)
@@ -245,3 +285,22 @@ def classify_relevance(text: str, *, lang: str | None = None, context_relevant: 
 def nuclear_sentences(body: str) -> list[str]:
     """Sentences of an article that mention a nuclear anchor term (relevant or not)."""
     return [s for s in split_sentences(body) if has_anchor(s)]
+
+
+def classify_article_sentences(
+    sentences: list[str], *, title: str | None, standfirst: str | None
+) -> list[Relevance]:
+    """Classify each extracted sentence of an article in the light of the whole article."""
+    context = article_context(title, standfirst, sentences)
+    return [classify_relevance(s, lang="en", article=context) for s in sentences]
+
+
+def classify_with_headline(text: str, headline: str | None) -> Relevance:
+    """Classify an article summary, judging it together with its headline when it lacks a keyword itself.
+
+    Abstracts often omit the keyword that the headline carries.
+    """
+    relevance = classify_relevance(text, lang="en")
+    if relevance.status != RELEVANT and headline:
+        relevance = classify_relevance(f"{headline}. {text}", lang="en")
+    return relevance

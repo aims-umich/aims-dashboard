@@ -170,6 +170,47 @@ def test_recompute_relevance_requeues_and_excludes(db, database_url):
     assert recompute_relevance(database_url)["changed"] == 0
 
 
+def test_recompute_relevance_classifies_like_the_collectors(db, database_url):
+    from sentiment.maintenance import recompute_relevance
+
+    def insert(platform, external_id, title, body, texts):
+        doc = db.execute(
+            "INSERT INTO documents (platform, external_id, kind, title, body, lang, published_at)"
+            " VALUES (%s, %s, 'article', %s, %s, 'en', now()) RETURNING id",
+            (platform, external_id, title, body),
+        ).fetchone()["id"]
+        for ordinal, text in enumerate(texts):
+            db.execute(
+                "INSERT INTO segments (document_id, ordinal, text, relevance)"
+                " VALUES (%s, %s, %s, 'relevant')",
+                (doc, ordinal, text),
+            )
+
+    # The NYT keyword is only in the headline, which the collector judges together with the abstract.
+    insert(
+        "nyt",
+        "a",
+        "A New Small Nuclear Reactor Is Approved",
+        "Regulators signed off on Tuesday.",
+        ["Regulators signed off on Tuesday."],
+    )
+    # A Guardian sentence is judged together with the rest of its article.
+    insert(
+        "guardian", "b", "Zverev clinches Laver Cup", "A tense final.", ["He hit a nuclear forehand to win."]
+    )
+    insert(
+        "guardian", "c", "Budget passes", None, ["A new nuclear plant was funded.", "Nuclear is the future."]
+    )
+
+    assert recompute_relevance(database_url) == {"checked": 4, "changed": 1, "relevant->excluded": 1}
+    reasons = db.execute(
+        "SELECT text, relevance_reason FROM segments WHERE relevance = 'excluded'"
+    ).fetchall()
+    assert [(r["text"], r["relevance_reason"]) for r in reasons] == [
+        ("He hit a nuclear forehand to win.", "off_topic_article")
+    ]
+
+
 def test_gpt_meta_commentary_is_stripped_from_legacy_summaries():
     from sentiment.importer.legacy import clean_gpt_summary
 

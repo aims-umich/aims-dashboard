@@ -6,7 +6,7 @@ set -euo pipefail
 cd /opt/dashboard
 
 # Read single keys instead of sourcing .env, which may contain characters the shell would interpret.
-env_get() { grep -E "^$1=" .env | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
+env_get() { grep -E "^$1=" .env | tail -n 1 | cut -d= -f2- | sed -e "s/^[\"']//" -e "s/[\"']\$//"; }
 BACKUP_AGE_RECIPIENT=$(env_get BACKUP_AGE_RECIPIENT)
 BACKUP_REMOTES=$(env_get BACKUP_REMOTES)
 HEALTHCHECKS_PING_KEY=$(env_get HEALTHCHECKS_PING_KEY)

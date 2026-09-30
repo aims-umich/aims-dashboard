@@ -1,6 +1,6 @@
 # HTTPS for the read API. Caddy obtains and renews the Let's Encrypt certificate itself.
+# No ACME email: Let's Encrypt does not need one, and Caddy renews certificates on its own.
 {
-	email {$ACME_EMAIL}
 	servers {
 		# Vercel's proxy sends the viewer's address in X-Forwarded-For. The API only uses it to
 		# share its rate limit fairly between viewers, so trusting it from any source is acceptable.

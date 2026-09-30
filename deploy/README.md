@@ -128,7 +128,11 @@ Vercel's Hobby plan is for non-commercial use, which fits a non-commercial acade
 | `YOUTUBE_API_KEY` | Google Cloud Console → new project → enable **YouTube Data API v3** → Credentials → API key | Restrict the key to the YouTube Data API. |
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Reddit's research-access request, then a "script" app at <https://www.reddit.com/prefs/apps> | Then add `reddit` to `ENABLED_SOURCES`. |
 
-After editing `.env` on the VM, apply it with `cd /opt/dashboard && docker compose up -d`.
+Enter each key with the helper, which hides the input, keeps it out of shell history, and restarts the collectors:
+
+```bash
+ssh -t -i ~/.ssh/aims_dashboard ubuntu@<vm> /opt/dashboard/deploy/set-secret.sh GUARDIAN_API_KEY
+```
 
 ## 7. Historical data (one time)
 

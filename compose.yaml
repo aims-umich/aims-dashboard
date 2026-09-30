@@ -75,7 +75,6 @@ services:
     profiles: [public]
     environment:
       API_DOMAIN: ${API_DOMAIN:-localhost}
-      ACME_EMAIL: ${ACME_EMAIL:-}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

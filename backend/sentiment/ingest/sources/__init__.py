@@ -8,12 +8,12 @@ from sentiment.ingest.sources.guardian import GuardianJob
 from sentiment.ingest.sources.mastodon import MastodonJob
 from sentiment.ingest.sources.nyt import NytJob
 from sentiment.ingest.sources.reddit import RedditComplianceJob, RedditJob
-from sentiment.ingest.sources.youtube import YouTubeCommentsJob, YouTubeSearchJob
+from sentiment.ingest.sources.youtube import YouTubeCommentsJob, YouTubeRefreshJob, YouTubeSearchJob
 
 JOBS_BY_SOURCE: dict[str, list[type[Job]]] = {
     "bluesky": [BlueskyStreamJob, BlueskyMetricsJob],
     "mastodon": [MastodonJob],
-    "youtube": [YouTubeSearchJob, YouTubeCommentsJob],
+    "youtube": [YouTubeSearchJob, YouTubeCommentsJob, YouTubeRefreshJob],
     "reddit": [RedditJob, RedditComplianceJob],
     "guardian": [GuardianJob],
     "nyt": [NytJob],

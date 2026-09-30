@@ -32,12 +32,10 @@ class Settings(BaseSettings):
     healthchecks_slug_prefix: str = "dashboard"
 
     # Ingest
-    # YouTube stays off: its standard API policy forbids cross-channel aggregation and derived
-    # metrics (Developer Policies III.E.2 and III.E.4.h); it needs YouTube Researcher Program access.
-    enabled_sources: str = "bluesky,mastodon,guardian,nyt"
-    # How long collected text may be kept, per platform ("platform=hours,..."). After that only the
-    # sentiment scores and dates remain. The Guardian's terms allow keeping content for 24 hours.
-    text_retention_hours: str = "guardian=24,nyt=24"
+    enabled_sources: str = "bluesky,mastodon,youtube,guardian,nyt"
+    # Optional text retention per platform ("platform=hours,..."): after the window only the sentiment
+    # scores and dates remain. Empty by default; YouTube's 30-day rule is handled by youtube_refresh.
+    text_retention_hours: str = ""
     retention_interval_s: int = 3600
     user_agent: str = "aims-sentiment-dashboard/1.0 (+https://dashboard.aims-umich.com/about)"
 
@@ -68,6 +66,10 @@ class Settings(BaseSettings):
     youtube_track_days: int = 14
     youtube_max_tracked_videos: int = 40
     youtube_region_code: str = "US"
+    # YouTube Developer Policies III.E.4: public API data may be kept 30 days, then refreshed or deleted.
+    youtube_refresh_after_days: int = 25
+    youtube_max_age_days: int = 30
+    youtube_refresh_interval_s: int = 21600
 
     reddit_client_id: SecretStr | None = None
     reddit_client_secret: SecretStr | None = None

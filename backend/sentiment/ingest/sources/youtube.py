@@ -250,3 +250,99 @@ class YouTubeCommentsJob(_YouTubeJob):
             "disabled": [vid for vid in disabled if vid in tracked],
         }
         return PollResult(documents=documents, cursor=new_cursor, fetched=fetched, metric_updates=updates)
+
+
+class YouTubeRefreshJob(_YouTubeJob):
+    """Keeps stored YouTube data inside the 30-day limit of the Developer Policies (III.E.4.d-e).
+
+    Comments and videos older than `youtube_refresh_after_days` since their last refresh are re-fetched
+    (50 per call, 1 quota unit each): edits are applied and re-scored, and anything YouTube no longer
+    returns is deleted. Whatever still could not be refreshed within `youtube_max_age_days` (for example
+    during a quota outage) is deleted as a backstop, so nothing is ever kept past 30 days unrefreshed.
+    """
+
+    name = "youtube_refresh"
+    MAX_PER_RUN = 5000
+
+    @property
+    def interval_s(self) -> float:
+        return self.settings.youtube_refresh_interval_s
+
+    async def _due(self, kind: str, days: int, limit: int) -> list[str]:
+        async with self.pool.connection() as conn:
+            rows = await (
+                await conn.execute(
+                    """
+                    SELECT external_id FROM documents
+                    WHERE platform = %s AND kind = %s
+                      AND COALESCE(metrics_updated_at, collected_at) < now() - make_interval(days => %s)
+                    ORDER BY COALESCE(metrics_updated_at, collected_at) LIMIT %s
+                    """,
+                    (PLATFORM, kind, days, limit),
+                )
+            ).fetchall()
+        return [row["external_id"] for row in rows]
+
+    async def poll(self, cursor: dict[str, Any]) -> PollResult:
+        refresh_days = self.settings.youtube_refresh_after_days
+        updates: list[tuple[str, str, dict[str, Any]]] = []
+        deletions: list[tuple[str, str]] = []
+        text_updates: list[tuple[str, str, str]] = []
+
+        comment_ids = await self._due("comment", refresh_days, self.MAX_PER_RUN)
+        for start in range(0, len(comment_ids), 50):
+            chunk = comment_ids[start : start + 50]
+            data = await self._get("comments", part="snippet", id=",".join(chunk), textFormat="plainText")
+            found = {item["id"]: item.get("snippet") or {} for item in data.get("items", [])}
+            for comment_id in chunk:
+                snippet = found.get(comment_id)
+                if snippet is None:
+                    deletions.append((PLATFORM, comment_id))
+                    continue
+                updates.append((PLATFORM, comment_id, {"likes": _int(snippet.get("likeCount"))}))
+                text = normalize(snippet.get("textOriginal") or snippet.get("textDisplay") or "")
+                if text:
+                    text_updates.append((PLATFORM, comment_id, text))
+
+        video_ids = await self._due("video", refresh_days, self.MAX_PER_RUN)
+        returned = {item["id"]: item for item in await self.videos(video_ids)}
+        for video_id in video_ids:
+            item = returned.get(video_id)
+            if item is None:
+                deletions.append((PLATFORM, video_id))  # Cascades to the video's comments.
+            else:
+                updates.append((PLATFORM, video_id, video_metrics(item.get("statistics") or {})))
+
+        # Backstop: anything still unrefreshed past the hard limit is deleted, never kept.
+        max_days = self.settings.youtube_max_age_days
+        refreshed = {external_id for _, external_id, _ in updates}
+        for kind in ("comment", "video"):
+            deletions += [
+                (PLATFORM, external_id)
+                for external_id in await self._due(kind, max_days, 100_000)
+                if external_id not in refreshed
+            ]
+        # Unchanged text is a no-op rewrite; only keep real edits so scores are not recomputed needlessly.
+        text_updates = await self._only_changed(text_updates)
+        return PollResult(
+            documents=[],
+            cursor={"refreshed": len(updates), "deleted": len(deletions), "edited": len(text_updates)},
+            fetched=len(comment_ids) + len(video_ids),
+            metric_updates=updates,
+            deletions=deletions,
+            text_updates=text_updates,
+        )
+
+    async def _only_changed(self, text_updates: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
+        if not text_updates:
+            return []
+        ids = [external_id for _, external_id, _ in text_updates]
+        async with self.pool.connection() as conn:
+            rows = await (
+                await conn.execute(
+                    "SELECT external_id, body FROM documents WHERE platform = %s AND external_id = ANY(%s)",
+                    (PLATFORM, ids),
+                )
+            ).fetchall()
+        current = {row["external_id"]: row["body"] for row in rows}
+        return [update for update in text_updates if current.get(update[1]) != update[2]]

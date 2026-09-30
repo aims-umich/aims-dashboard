@@ -5,7 +5,8 @@ so historical and live data points are scored the same way by the same model.
 Human labels from the original training/test CSVs are kept in `documents.raw.true_label`.
 
 The scraped Threads data (backend/threads/*, backend/posts.db) is deliberately NOT importable:
-it was collected against Meta's terms and must not be published.
+it was collected against Meta's terms and must not be published. Neither are the old YouTube comments,
+which are past YouTube's 30-day storage limit and have no ids to refresh.
 """
 
 from __future__ import annotations
@@ -272,7 +273,11 @@ def documents_for(source: str, paths: dict[str, Any]) -> Iterator[DocumentIn]:
     if source == "mastodon":
         return mastodon_documents(paths["mastodon"])
     if source == "youtube":
-        return youtube_documents(paths["youtube"])
+        # YouTube API data may be kept at most 30 days unrefreshed (Developer Policies III.E.4), and these
+        # 2023-2025 comments have no ids to refresh with, so they must not be stored.
+        raise ValueError(
+            "Legacy YouTube comments are past YouTube's 30-day storage limit and cannot be imported"
+        )
     if source == "nyt":
         return nyt_documents(paths["nyt"])
     raise ValueError(f"No legacy importer for {source!r} (Threads data is intentionally excluded)")

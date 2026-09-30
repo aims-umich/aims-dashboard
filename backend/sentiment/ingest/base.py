@@ -51,6 +51,8 @@ class PollResult:
     # Optional follow-up writes that must commit with the documents (metrics refreshes, deletions).
     metric_updates: list[tuple[str, str, dict[str, Any]]] = field(default_factory=list)
     deletions: list[tuple[str, str]] = field(default_factory=list)
+    # (platform, external_id, new text) for single-segment documents whose text changed at the source.
+    text_updates: list[tuple[str, str, str]] = field(default_factory=list)
 
 
 class RateLimitedError(Exception):

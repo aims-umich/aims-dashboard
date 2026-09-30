@@ -51,7 +51,7 @@ PLATFORMS: dict[str, Platform] = {
             "YouTube",
             ("comment",),
             (("likes", "Likes"), ("replies", "Replies")),
-            ("youtube", "youtube_comments"),
+            ("youtube", "youtube_comments", "youtube_refresh"),
             "comments",
         ),
         Platform("guardian", "The Guardian", ("article",), (), ("guardian",), "sentences"),

@@ -371,3 +371,55 @@ def test_redact_scrubs_known_secrets_and_key_params():
         redact(message, ["s3cr3t"])
         == "HTTP 401 from api.example.com/search?api-key=***&q=x token=*** and literal ***"
     )
+
+
+async def _seed_youtube(pool, db, ages_days: dict[str, int]):
+    from sentiment.ingest.sources.youtube import parse_comment_thread, parse_video
+
+    video = parse_video(f.youtube_video("vid1", "Nuclear reactors explained"))
+    comments = [
+        parse_comment_thread(
+            f.youtube_thread(cid, f"text of {cid}", published="2026-09-01T00:00:00Z"), "vid1"
+        )
+        for cid in ages_days
+    ]
+    async with pool.connection() as conn, conn.transaction():
+        await store.save_documents(conn, [video, *comments])
+    for cid, days in ages_days.items():
+        db.execute(
+            "UPDATE documents SET metrics_updated_at = now() - make_interval(days => %s)"
+            " WHERE external_id = %s",
+            (days, cid),
+        )
+
+
+@respx.mock
+async def test_youtube_refresh_applies_edits_and_deletes_removed(settings, client, pool, db):
+    from sentiment.ingest.sources.youtube import YouTubeRefreshJob
+
+    await _seed_youtube(pool, db, {"c-edit": 26, "c-gone": 27, "c-fresh": 2})
+    respx.get("https://www.googleapis.com/youtube/v3/comments").respond(
+        json={"items": [{"id": "c-edit", "snippet": {"textOriginal": "edited text", "likeCount": 9}}]}
+    )
+    result = await YouTubeRefreshJob(settings, client, pool).poll({})
+    assert respx.calls.last.request.url.params["id"] == "c-gone,c-edit"  # oldest first, fresh one untouched
+    assert result.deletions == [("youtube", "c-gone")]
+    assert result.text_updates == [("youtube", "c-edit", "edited text")]
+    async with pool.connection() as conn:
+        await store.commit_run(conn, "youtube_refresh", result, 21600)
+    rows = {
+        r["external_id"]: r for r in db.execute("SELECT external_id, body, metrics FROM documents").fetchall()
+    }
+    assert set(rows) == {"vid1", "c-edit", "c-fresh"}
+    assert rows["c-edit"]["body"] == "edited text" and rows["c-edit"]["metrics"]["likes"] == 9
+
+
+async def test_youtube_backstop_deletes_anything_unrefreshed_past_30_days(
+    settings, client, pool, db, monkeypatch
+):
+    from sentiment.ingest.sources.youtube import YouTubeRefreshJob
+
+    await _seed_youtube(pool, db, {"c-stale": 31, "c-due": 26})
+    monkeypatch.setattr(YouTubeRefreshJob, "MAX_PER_RUN", 0)  # e.g. quota exhausted: nothing gets refreshed
+    result = await YouTubeRefreshJob(settings, client, pool).poll({})
+    assert result.deletions == [("youtube", "c-stale")]

@@ -125,7 +125,7 @@ Vercel's Hobby plan is for non-commercial use, which fits a non-commercial acade
 |---|---|---|
 | `GUARDIAN_API_KEY` | <https://open-platform.theguardian.com/access/> → Developer key | The old key and the public `test` key both return 401 now. |
 | `NYT_API_KEY` | <https://developer.nytimes.com/> → My Apps → New App, enable **Article Search API** and **Archive API** | Use the app's **Key**; the Secret is not needed. |
-| `YOUTUBE_API_KEY` | Only after approval by the [YouTube Researcher Program](https://research.youtube/) | The standard API terms forbid cross-channel aggregation and derived metrics (Developer Policies III.E.2, III.E.4.h), which is what this dashboard does. |
+| `YOUTUBE_API_KEY` | Google Cloud Console → new project → enable **YouTube Data API v3** → Credentials → API key | Restrict the key to the YouTube Data API. The `youtube_refresh` job keeps stored data within YouTube's 30-day limit. |
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Reddit's research-access request, then a "script" app at <https://www.reddit.com/prefs/apps> | Then add `reddit` to `ENABLED_SOURCES`. |
 
 Enter each key with the helper, which hides the input, keeps it out of shell history, and restarts the collectors:
@@ -141,18 +141,18 @@ Copy it to the VM and import it inside the stack:
 
 ```bash
 # on the laptop, from backend/
-tar czf legacy.tgz guardian/database/guardian.db mastodon/*.csv youtube/Youtube_Label.csv newyorktimes/var/dashdb.sqlite3
+tar czf legacy.tgz guardian/database/guardian.db mastodon/*.csv newyorktimes/var/dashdb.sqlite3
 scp legacy.tgz "$VM:/tmp/" && rm legacy.tgz
 
 # on the VM
 mkdir -p /tmp/legacy && tar xzf /tmp/legacy.tgz -C /tmp/legacy
 cd /opt/dashboard
-docker compose run --rm -v /tmp/legacy:/legacy:ro ingest import-legacy guardian mastodon youtube nyt --backend-dir /legacy
+docker compose run --rm -v /tmp/legacy:/legacy:ro ingest import-legacy guardian mastodon nyt --backend-dir /legacy
 rm -rf /tmp/legacy /tmp/legacy.tgz
 ```
 
 The scorer rescores everything with the pinned model, taking about 10 minutes for the roughly 1,000 relevant segments.
-The scraped Threads data is deliberately not importable.
+The scraped Threads data and the old YouTube comments (past YouTube's 30-day limit) are deliberately not importable.
 
 ## 8. Backups (you, then automatic)
 

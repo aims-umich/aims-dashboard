@@ -19,12 +19,12 @@ It started as a UROP Symposium project and now runs as a live service at `dashbo
 |---|---|---|
 | Bluesky | Jetstream firehose (no account needed); deletions honored as they arrive | Seconds |
 | Mastodon | Public hashtag timelines | 2 minutes |
-| The Guardian | Content API, scored sentence by sentence; text kept 24 hours | 30 minutes |
-| New York Times | Article Search API (abstract and lead paragraph); text kept 24 hours; history from the Archive API | 1 hour |
-| YouTube | Built, but **off**: the standard API forbids aggregation and derived metrics (Developer Policies III.E.2, III.E.4.h). Needs YouTube Researcher Program access | - |
+| YouTube | New nuclear-energy videos, then their comment threads (Data API v3); refreshed or deleted within 30 days | 30 minutes |
+| The Guardian | Content API, scored sentence by sentence | 30 minutes |
+| New York Times | Article Search API (abstract and lead paragraph); history from the Archive API | 1 hour |
 | Reddit | Official API; off until Reddit approves research access | 2 minutes |
 
-Every source uses its official API within its terms, and a retention job enforces each platform's storage limits (after that the charts keep only scores).
+Every source uses its official API within its terms. YouTube data is refreshed or deleted within 30 days (Developer Policies III.E.4) and shown only as topic-level aggregates, never per-channel scores; an optional per-platform text retention window (`TEXT_RETENTION_HOURS`) keeps only scores after it expires.
 Threads and X are not collected.
 Posts are filtered before scoring: idioms ("the nuclear option"), weapons and geopolitics, medicine, and non-English text are excluded, so trends reflect discussion of nuclear energy.
 
@@ -70,7 +70,7 @@ Or run everything in containers: `cp deploy/env.example .env`, set `POSTGRES_PAS
 
 Other commands:
 
-- `sentiment import-legacy guardian mastodon youtube nyt` - load the pre-2026 SQLite/CSV data (kept locally, never in git).
+- `sentiment import-legacy guardian mastodon nyt` - load the pre-2026 SQLite/CSV data (kept locally, never in git).
 - `sentiment relevance [--dry-run]` - re-apply the relevance rules after changing them.
 - `sentiment backfill-nyt --from 2021-01 --to 2025-12 --replace-legacy` - rebuild NYT history from the Archive API.
 - `sentiment models list` / `sentiment models activate NAME [REVISION]` - choose which model the dashboard shows.

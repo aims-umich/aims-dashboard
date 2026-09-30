@@ -118,12 +118,13 @@ def legacy_dir(tmp_path):
 
 
 async def test_legacy_import_is_idempotent_and_dates_comments_correctly(legacy_dir, database_url, db):
-    from sentiment.importer.legacy import default_paths
+    from sentiment.importer.legacy import default_paths, youtube_documents
 
     paths = default_paths(legacy_dir)
-    for source in ("guardian", "youtube"):
-        await import_documents(database_url, documents_for(source, paths))
-    again = await import_documents(database_url, documents_for("youtube", paths))
+    await import_documents(database_url, documents_for("guardian", paths))
+    # The CLI refuses YouTube (30-day rule); the parser itself is still exercised for correctness.
+    await import_documents(database_url, youtube_documents(paths["youtube"]))
+    again = await import_documents(database_url, youtube_documents(paths["youtube"]))
     assert again["new_documents"] == 0
     rows = db.execute(
         "SELECT platform, kind, external_id, published_at, origin, raw FROM documents ORDER BY id"
@@ -141,11 +142,13 @@ async def test_legacy_import_is_idempotent_and_dates_comments_correctly(legacy_d
     assert [s["text"] for s in segments] == ["The nuclear plant reopened.", "Loved it"]
 
 
-def test_threads_cannot_be_imported(legacy_dir):
+def test_threads_and_legacy_youtube_cannot_be_imported(legacy_dir):
     from sentiment.importer.legacy import default_paths
 
     with pytest.raises(ValueError, match="Threads data is intentionally excluded"):
         documents_for("threads", default_paths(legacy_dir))
+    with pytest.raises(ValueError, match="30-day storage limit"):
+        documents_for("youtube", default_paths(legacy_dir))
 
 
 def test_recompute_relevance_requeues_and_excludes(db, database_url):

@@ -30,15 +30,16 @@ export default function About() {
         <p>
           Every source is read through its official, public API and within its terms of use. Bluesky posts arrive
           from the public Jetstream feed within seconds. Mastodon hashtag timelines are checked every two minutes.
-          The Guardian and the New York Times are checked every 30 to 60 minutes, as their API quotas allow. Each page
-          shows when its source last updated.
+          YouTube, The Guardian, and the New York Times are checked every 30 to 60 minutes, as their API quotas allow.
+          Each page shows when its source last updated.
         </p>
         <p>
           We only keep what we need to show the charts: the text that is scored, a link to the original, the
           author&apos;s public handle, and engagement counts. Bluesky and Reddit posts that are deleted at the source are
           removed here automatically. Mastodon accounts that opted out of indexing, bot accounts, and Bluesky
-          accounts hidden from logged-out viewers are left out. News articles are kept for 24 hours; after that only
-          their sentiment scores remain.
+          accounts hidden from logged-out viewers are left out. YouTube data is refreshed from YouTube at least every
+          30 days, and anything removed there is removed here. YouTube results are shown only as topic-level
+          aggregates, never as scores for individual channels.
         </p>
       </Section>
 
@@ -83,7 +84,6 @@ export default function About() {
         <p>
           Built by the AIMS Lab. The original platform dashboards were developed by Jeremy Moon, Andre Gala-Garza
           (Mastodon), Arvind Kutirakulam (YouTube), Yikun Yang (The Guardian), and Huawen Shen (New York Times).
-          YouTube is paused while we apply for research access through YouTube&apos;s Researcher Program.
         </p>
       </Section>
 

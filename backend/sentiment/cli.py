@@ -108,7 +108,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("api", help="serve the read API on :8000").set_defaults(func=cmd_api)
 
     legacy = sub.add_parser("import-legacy", help="import the pre-2026 SQLite/CSV data")
-    legacy.add_argument("sources", nargs="+", choices=["guardian", "mastodon", "youtube", "nyt"])
+    legacy.add_argument("sources", nargs="+", choices=["guardian", "mastodon", "nyt"])
     legacy.add_argument(
         "--backend-dir", default=str(BACKEND_DIR), help="folder holding the old collector data"
     )

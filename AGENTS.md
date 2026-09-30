@@ -45,8 +45,8 @@ Checks: `ruff check . && ruff format --check . && pytest` in `backend/`; `npm ru
 ## Rules and gotchas
 
 - **Official APIs only, within each platform's terms.** No scraping. Threads and X are out of scope.
-  YouTube is off: the standard API forbids aggregation and derived metrics (Developer Policies III.E.2, III.E.4.h); it needs YouTube Researcher Program access.
-  Guardian and NYT text is purged 24 hours after collection by the retention job (`TEXT_RETENTION_HOURS`); only scores and dates stay.
+  YouTube data must be refreshed or deleted within 30 days (Developer Policies III.E.4); `youtube_refresh` does both, and YouTube is shown only as topic-level aggregates, never per-channel scores. Old YouTube data without comment ids cannot be refreshed, so it is not imported.
+  `TEXT_RETENTION_HOURS` (empty by default) can purge a platform's text after a window, keeping only scores and dates.
   Mastodon `noindex` and bot accounts, and Bluesky accounts labeled `!no-unauthenticated`, are never shown.
   The old Playwright Threads scraper and its data (`backend/threads/*`, `backend/posts.db`) violated Meta's terms: never import, display, or publish them.
   `posts.db` was committed to the public repo before September 2026 and is still in git history.

@@ -15,7 +15,7 @@ from psycopg.types.json import Jsonb
 
 from sentiment.db import NEW_SEGMENTS_CHANNEL
 from sentiment.ingest.base import DocumentIn, PollResult
-from sentiment.text import RELEVANT
+from sentiment.text import RELEVANT, classify_relevance
 
 UPSERT_DOCUMENT_SQL = """
     INSERT INTO documents (platform, external_id, kind, parent_id, url, author_handle, title, body,
@@ -125,6 +125,32 @@ async def update_metrics(conn: AsyncConnection, updates: list[tuple[str, str, di
     return count
 
 
+async def update_texts(conn: AsyncConnection, updates: list[tuple[str, str, str]]) -> int:
+    """Replace edited text on single-segment documents and drop their scores so they are scored again."""
+    count = 0
+    for platform, external_id, text in updates:
+        row = await (
+            await conn.execute(
+                "UPDATE documents SET body = %s WHERE platform = %s AND external_id = %s RETURNING id, kind",
+                (text, platform, external_id),
+            )
+        ).fetchone()
+        if row is None:
+            continue
+        relevance = classify_relevance(text, context_relevant=row["kind"] == "comment")
+        segment = await (
+            await conn.execute(
+                "UPDATE segments SET text = %s, relevance = %s, relevance_reason = %s"
+                " WHERE document_id = %s AND ordinal = 0 RETURNING id",
+                (text, relevance.status, relevance.reason, row["id"]),
+            )
+        ).fetchone()
+        if segment:
+            await conn.execute("DELETE FROM predictions WHERE segment_id = %s", (segment["id"],))
+        count += 1
+    return count
+
+
 async def delete_documents(conn: AsyncConnection, keys: list[tuple[str, str]]) -> int:
     """Honor deletions at the source (platform terms require it). Cascades to segments and scores."""
     by_platform: dict[str, list[str]] = {}
@@ -149,6 +175,7 @@ async def commit_run(
             saved.updated_metrics += await update_metrics(conn, result.metric_updates)
         if result.deletions:
             saved.deleted = await delete_documents(conn, result.deletions)
+        edited = await update_texts(conn, result.text_updates) if result.text_updates else 0
         await conn.execute(
             """
             INSERT INTO ingest_state (source, cursor, interval_s, last_run_at, last_success_at,
@@ -162,7 +189,7 @@ async def commit_run(
             """,
             (job_name, Jsonb(result.cursor), int(interval_s), result.fetched, saved.new_documents),
         )
-        if saved.new_segments:
+        if saved.new_segments or edited:
             await conn.execute(f"NOTIFY {NEW_SEGMENTS_CHANNEL}")
     return saved
 

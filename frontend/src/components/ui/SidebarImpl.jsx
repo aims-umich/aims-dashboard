@@ -72,7 +72,8 @@ export const MobileSidebar = ({ className, children, actions }) => {
             exit={{ x: "-100%" }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
             className={classNames(
-              "fixed inset-0 z-50 flex h-full w-full flex-col justify-between bg-white p-6 dark:bg-gray-800",
+              // Top padding clears the close button so it never overlaps the first link.
+              "fixed inset-0 z-50 flex h-full w-full flex-col justify-between bg-white px-6 pb-6 pt-16 dark:bg-gray-800",
               className,
             )}
           >

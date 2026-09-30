@@ -20,9 +20,11 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          charts: ["recharts"],
-          motion: ["framer-motion"],
+        // Keep the big chart and animation libraries in their own cacheable chunks.
+        manualChunks(id) {
+          if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) return "charts"
+          if (id.includes("node_modules/framer-motion") || id.includes("node_modules/motion-")) return "motion"
+          return undefined
         },
       },
     },

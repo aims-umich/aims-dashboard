@@ -25,7 +25,7 @@ dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6", "respx>=0.21"]
 sentiment = "sentiment.cli:main"
 
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=84"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

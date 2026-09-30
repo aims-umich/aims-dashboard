@@ -23,10 +23,13 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dashboard_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/constraints.txt }
+        with: { python-version: "3.14", cache: pip, cache-dependency-path: backend/constraints.txt }
       - run: pip install -c constraints.txt -e ".[dev]"
+      # Install the scorer's ML runtime exactly as the image does, so conflicting pins fail here.
+      - name: Scorer dependencies install as in the image
+        run: sh scripts/install-scorer-deps.sh
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q
@@ -35,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: npm ci
@@ -57,9 +60,9 @@ jobs:
       ENABLED_SOURCES: bluesky,mastodon,youtube,guardian,nyt
       LOG_FORMAT: text
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/constraints.txt }
+        with: { python-version: "3.14", cache: pip, cache-dependency-path: backend/constraints.txt }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - name: Start the API on seeded demo data
@@ -76,7 +79,7 @@ jobs:
           npx playwright install --with-deps chromium
           npx playwright test
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-results
           path: |
@@ -87,10 +90,10 @@ jobs:
   image:
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
       - name: Build the app image (the scorer image is built on deploy)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: backend
           target: app

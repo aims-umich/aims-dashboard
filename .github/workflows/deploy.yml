@@ -35,7 +35,7 @@ jobs:
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
       - id: repo
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: backend
           target: app
@@ -44,7 +44,7 @@ jobs:
           tags: ${{ steps.repo.outputs.image }}:${{ github.sha }},${{ steps.repo.outputs.image }}:latest
           cache-from: type=gha,scope=app
           cache-to: type=gha,scope=app,mode=max
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: backend
           target: scorer

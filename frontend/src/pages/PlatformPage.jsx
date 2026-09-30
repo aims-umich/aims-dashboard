@@ -41,7 +41,7 @@ function PageHeader({ config, status, range, onRange, region, onRegion }) {
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
           <FreshnessBadge status={status} />
           <span>Collected: {config.cadence}</span>
-          {config.credit && <span>Original dashboard by {config.credit}</span>}
+          {config.credit && <span>Early collector script by {config.credit}</span>}
           {config.attribution && (
             <a href={config.attribution.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
               {config.attribution.text}

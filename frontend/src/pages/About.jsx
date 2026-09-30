@@ -82,7 +82,8 @@ export default function About() {
 
       <Section title="Contributors">
         <p>
-          Built by the AIMS Lab. The original platform dashboards were developed by Jeremy Moon, Andre Gala-Garza
+          Designed and built by Jeremy Moon at the AIMS Lab, including the dashboard, the frontend, and the pipeline
+          that connects every platform. Early data-collection scripts were contributed by Andre Gala-Garza
           (Mastodon), Arvind Kutirakulam (YouTube), Yikun Yang (The Guardian), and Huawen Shen (New York Times).
         </p>
       </Section>

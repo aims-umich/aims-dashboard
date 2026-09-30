@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { getJson } from "../lib/api"
 import { formatCompact, formatDateTime } from "../lib/format"
 import { SENTIMENTS, SENTIMENT_LABELS } from "../lib/sentiment"
@@ -76,22 +76,24 @@ export default function RecentPosts({ platform, fields, isArticle, title, note, 
   const [sentiment, setSentiment] = useState("all")
   const query = `/platforms/${platform}/posts?limit=${PAGE}${sentiment === "all" ? "" : `&sentiment=${sentiment}`}${regionQuery}`
   const { data, error } = usePolling(query)
-  const [more, setMore] = useState({ items: [], cursor: undefined, loading: false })
-
-  // A new filter, or a poll that brings in newer items, resets anything loaded with "Show more".
+  // Pages loaded with "Show more" belong to one first page. A new filter, or a poll that brings in
+  // newer items, changes `head`, and older extra pages are then simply ignored (no reset effect needed).
   const head = `${query}|${data?.items?.[0]?.id ?? ""}`
-  useEffect(() => setMore({ items: [], cursor: undefined, loading: false }), [head])
+  const [loaded, setLoaded] = useState({ head: null, items: [], cursor: undefined, loading: false })
+  const more = loaded.head === head ? loaded : { head, items: [], cursor: undefined, loading: false }
 
   const items = [...(data?.items ?? []), ...more.items]
   const cursor = more.cursor === undefined ? data?.next_cursor : more.cursor
 
   const loadMore = async () => {
-    setMore((m) => ({ ...m, loading: true }))
+    setLoaded({ ...more, loading: true })
     try {
       const page = await getJson(`${query}&before=${encodeURIComponent(cursor)}`)
-      setMore((m) => ({ items: [...m.items, ...page.items], cursor: page.next_cursor, loading: false }))
+      setLoaded((m) =>
+        m.head === head ? { head, items: [...m.items, ...page.items], cursor: page.next_cursor, loading: false } : m,
+      )
     } catch {
-      setMore((m) => ({ ...m, loading: false }))
+      setLoaded((m) => (m.head === head ? { ...m, loading: false } : m))
     }
   }
 

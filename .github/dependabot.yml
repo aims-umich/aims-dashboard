@@ -1,21 +1,33 @@
+# One grouped PR per ecosystem per month instead of one PR per package.
+# Separate PRs for every package all rewrite the same lock file, so merging one conflicts the rest and
+# Dependabot refills the queue as fast as it drains. Minor and patch updates share one PR; major versions
+# share another, so breaking changes are reviewed together without holding back routine updates.
 version: 2
 updates:
-  - { package-ecosystem: github-actions, directory: /, schedule: { interval: weekly } }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      actions: { patterns: ["*"] }
+
   - package-ecosystem: npm
     directory: /frontend
-    schedule: { interval: weekly }
-    open-pull-requests-limit: 5
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 2
     ignore:
       # eslint-plugin-react (needed for JSX-aware unused-variable checks) supports ESLint 9 at most.
       - { dependency-name: eslint, versions: [">=10"] }
       - { dependency-name: "@eslint/js", versions: [">=10"] }
     groups:
-      # Vite and its plugins must move together (peer ranges), so update them in one PR.
+      # Vite and its plugins must move together (peer ranges). Listed first, so it wins over the groups below.
       vite: { patterns: [vite, "@vitejs/*", "@tailwindcss/*", tailwindcss] }
+      minor-and-patch: { patterns: ["*"], update-types: [minor, patch] }
+      major: { patterns: ["*"], update-types: [major] }
+
   - package-ecosystem: pip
     directory: /backend
-    schedule: { interval: weekly }
-    open-pull-requests-limit: 5
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 2
     ignore:
       # transformers 5.x (the scorer) requires huggingface-hub < 2.
       - { dependency-name: huggingface-hub, versions: [">=2"] }
@@ -23,4 +35,10 @@ updates:
       - { dependency-name: mpmath, versions: [">=1.4"] }
       # pydantic pins pydantic-core exactly; it updates when pydantic does.
       - { dependency-name: pydantic-core }
-  - { package-ecosystem: docker, directory: /backend, schedule: { interval: monthly } }
+    groups:
+      minor-and-patch: { patterns: ["*"], update-types: [minor, patch] }
+      major: { patterns: ["*"], update-types: [major] }
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule: { interval: monthly }

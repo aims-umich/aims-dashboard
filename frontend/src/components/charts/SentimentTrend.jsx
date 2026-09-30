@@ -79,7 +79,12 @@ export default function SentimentTrend({ trend, bucket, unit }) {
                 />
               }
             />
-            <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+            {/* Same order as the breakdown card; Recharts 3 otherwise sorts legend items alphabetically. */}
+            <Legend
+              iconType="circle"
+              wrapperStyle={{ fontSize: 12 }}
+              itemSorter={(item) => SENTIMENTS.indexOf(item.dataKey)}
+            />
             {SENTIMENTS.map((s) => (
               <Area
                 key={s}

@@ -76,6 +76,11 @@ _EN_STOPWORDS = frozenset(
     "has had do does did will would can could should what which who how why when there here "
     "more than".split()
 )
+# Words that carry no sentiment of their own, left out of per-word explanations.
+FUNCTION_WORDS = _EN_STOPWORDS | frozenset(
+    "all also any both each even every into its just may might must only other over same some such then "
+    "too under until upon very while whom yet".split()
+)
 # Common function words of the other languages that show up most in nuclear hashtags.
 _FOREIGN_STOPWORDS = (
     frozenset(

@@ -164,3 +164,42 @@ def test_scorer_wakes_on_notify(db, settings):
     thread.join(timeout=10)
     assert db.execute("SELECT count(*) AS n FROM predictions").fetchone()["n"] == 1
     assert not thread.is_alive()
+
+
+def test_explanations_cover_recent_posts_only_and_skip_classifiers_that_cannot_explain(db):
+    from sentiment.scorer.service import explain_batch
+
+    seed(db, ["nuclear power is good", "nuclear power is bad"])
+    db.execute("UPDATE documents SET published_at = now() - interval '30 days' WHERE external_id = 'd1'")
+    clf = FakeClassifier()
+    model_id = register_model(db, clf.info)
+    score_batch(db, clf, model_id, 10)
+
+    class Mute:
+        info = clf.info
+
+        def predict(self, texts):
+            return clf.predict(texts)
+
+    assert explain_batch(db, Mute(), model_id, 10, days=14) == 0
+    assert explain_batch(db, clf, model_id, 10, days=14) == 1
+    assert explain_batch(db, clf, model_id, 10, days=14) == 0
+    [row] = db.execute("SELECT spans FROM explanations").fetchall()
+    assert row["spans"] == [[17, 21, 1.0]]
+
+
+async def test_saved_segments_carry_their_topics(pool, db):
+    from sentiment.ingest.store import save_documents
+
+    async with pool.connection() as conn, conn.transaction():
+        await save_documents(conn, [post("t1", "Spent fuel from the SMR is waste")])
+    [row] = db.execute("SELECT topics FROM segments").fetchall()
+    assert row["topics"] == ["advanced-reactors", "waste", "fuel"]
+
+
+def test_recompute_topics_updates_changed_rules(db, database_url):
+    from sentiment.maintenance import recompute_topics
+
+    seed(db, ["Fusion power is good", "Nuclear power is good"])
+    assert recompute_topics(database_url) == {"checked": 2, "changed": 1}
+    assert recompute_topics(database_url) == {"checked": 2, "changed": 0}

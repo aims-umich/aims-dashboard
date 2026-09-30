@@ -14,6 +14,7 @@ import threading
 import time
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from sentiment.classifier import Classifier, ModelInfo, build_classifier
 from sentiment.config import Settings
@@ -37,6 +38,25 @@ CLAIM_SQL = """
 RECHECK_SQL = """
     SELECT id FROM unnest(%(ids)s::bigint[]) AS id
     WHERE NOT EXISTS (SELECT 1 FROM predictions p WHERE p.segment_id = id AND p.model_id = %(model_id)s)
+"""
+
+# Recent posts and comments (the kinds listed as individual texts on the site), newest first.
+EXPLAIN_CLAIM_SQL = """
+    SELECT s.id, s.text
+    FROM segments s
+    JOIN documents d ON d.id = s.document_id
+    JOIN predictions p ON p.segment_id = s.id AND p.model_id = %(model_id)s
+    WHERE s.relevance = 'relevant' AND s.text <> '' AND d.kind IN ('post', 'comment')
+      AND d.published_at > now() - make_interval(days => %(days)s)
+      AND NOT EXISTS (SELECT 1 FROM explanations e WHERE e.segment_id = s.id AND e.model_id = %(model_id)s)
+    ORDER BY d.published_at DESC
+    LIMIT %(limit)s
+    FOR UPDATE OF s SKIP LOCKED
+"""
+
+EXPLAIN_INSERT_SQL = """
+    INSERT INTO explanations (segment_id, model_id, spans) VALUES (%s, %s, %s)
+    ON CONFLICT (segment_id, model_id) DO NOTHING
 """
 
 INSERT_SQL = """
@@ -108,6 +128,31 @@ def score_batch(conn: psycopg.Connection, classifier: Classifier, model_id: int,
     return len(rows)
 
 
+def explain_batch(
+    conn: psycopg.Connection, classifier: Classifier, model_id: int, limit: int, days: int
+) -> int:
+    """Explain one batch of recent scored posts. Returns 0 when the classifier cannot explain."""
+    explain = getattr(classifier, "explain", None)
+    if explain is None:
+        return 0
+    with conn.transaction():
+        rows = conn.execute(
+            EXPLAIN_CLAIM_SQL, {"model_id": model_id, "limit": limit, "days": days}
+        ).fetchall()
+        if not rows:
+            return 0
+        spans = explain([row["text"] for row in rows])
+        with conn.cursor() as cur:
+            cur.executemany(
+                EXPLAIN_INSERT_SQL,
+                [
+                    (row["id"], model_id, Jsonb([list(s) for s in found]))
+                    for row, found in zip(rows, spans, strict=True)
+                ],
+            )
+    return len(rows)
+
+
 class Scorer:
     def __init__(self, settings: Settings, classifier: Classifier | None = None) -> None:
         self.settings = settings
@@ -146,6 +191,16 @@ class Scorer:
                     last_beat = time.monotonic()
                 if scored >= settings.scorer_batch_size:
                     continue  # More work is probably waiting; keep draining.
+                # Scoring is caught up: spend the idle time on explanations, one small batch at a time,
+                # checking for new posts to score between batches.
+                if settings.scorer_explain and explain_batch(
+                    work,
+                    self.classifier,
+                    model_id,
+                    settings.scorer_explain_batch,
+                    settings.scorer_explain_days,
+                ):
+                    continue
                 self._wait_for_work(listener)
 
     def _wait_for_work(self, listener: psycopg.Connection) -> None:

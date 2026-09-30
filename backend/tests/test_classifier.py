@@ -52,3 +52,26 @@ def test_micro_batching_keeps_order_and_scores():
     batched = LocalHFClassifier(settings.scorer_model, revision=settings.scorer_revision, micro_batch=8)
     for a, b in zip(single.predict(texts), batched.predict(texts), strict=True):
         assert a == pytest.approx(b, abs=1e-4)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("RUN_MODEL_TESTS"), reason="set RUN_MODEL_TESTS=1 to load the BERT model"
+)
+def test_explanations_point_at_the_words_that_carry_the_sentiment():
+    from sentiment.classifier.local_hf import LocalHFClassifier
+    from sentiment.config import Settings
+
+    settings = Settings(_env_file=None)
+    clf = LocalHFClassifier(settings.scorer_model, revision=settings.scorer_revision)
+    good, bad = clf.explain(
+        [
+            "Nuclear power is clean, safe, and exactly what we need.",
+            "This nuclear plant is a dangerous disaster.",
+        ]
+    )
+    text = "Nuclear power is clean, safe, and exactly what we need."
+    assert text[good[0][0] : good[0][1]] == "safe" and good[0][2] == 1.0
+    assert "dangerous" in {
+        "This nuclear plant is a dangerous disaster."[s:e] for s, e, score in bad if score < 0
+    }
+    assert all(-1 <= score <= 1 for _, _, score in good + bad)

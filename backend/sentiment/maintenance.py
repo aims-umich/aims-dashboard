@@ -8,6 +8,7 @@ from typing import Any
 
 from sentiment.db import NEW_SEGMENTS_CHANNEL, connect
 from sentiment.text import Relevance, classify_article_sentences, classify_relevance, classify_with_headline
+from sentiment.topics import topics_for
 
 
 def classify_document(doc: dict[str, Any], texts: list[str]) -> list[Relevance]:
@@ -53,6 +54,24 @@ def recompute_relevance(database_url: str, *, dry_run: bool = False) -> dict[str
                 )
                 cur.execute(f"NOTIFY {NEW_SEGMENTS_CHANNEL}")
     return {"checked": len(rows), "changed": sum(changes.values()), **changes}
+
+
+def recompute_topics(database_url: str, *, dry_run: bool = False) -> dict[str, int]:
+    """Re-apply the current topic rules in `sentiment.topics` to every stored segment with text."""
+    with connect(database_url) as conn:
+        rows = conn.execute(
+            """
+            SELECT s.id, s.text, s.topics FROM segments s JOIN documents d ON d.id = s.document_id
+            WHERE d.text_purged_at IS NULL
+            """
+        ).fetchall()
+        updates = [
+            (topics, row["id"]) for row in rows if (topics := topics_for(row["text"])) != row["topics"]
+        ]
+        if updates and not dry_run:
+            with conn.transaction(), conn.cursor() as cur:
+                cur.executemany("UPDATE segments SET topics = %s WHERE id = %s", updates)
+    return {"checked": len(rows), "changed": len(updates)}
 
 
 DEMO_TEXTS = (

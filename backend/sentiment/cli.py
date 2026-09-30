@@ -50,6 +50,12 @@ def cmd_relevance(args: argparse.Namespace) -> None:
     print(json.dumps(recompute_relevance(get_settings().database_url, dry_run=args.dry_run)))
 
 
+def cmd_topics(args: argparse.Namespace) -> None:
+    from sentiment.maintenance import recompute_topics
+
+    print(json.dumps(recompute_topics(get_settings().database_url, dry_run=args.dry_run)))
+
+
 def cmd_seed_demo(_: argparse.Namespace) -> None:
     from sentiment.maintenance import seed_demo
 
@@ -117,6 +123,9 @@ def build_parser() -> argparse.ArgumentParser:
     relevance = sub.add_parser("relevance", help="re-apply the relevance rules to stored segments")
     relevance.add_argument("--dry-run", action="store_true", help="only report what would change")
     relevance.set_defaults(func=cmd_relevance)
+    topics = sub.add_parser("topics", help="re-apply the topic rules to stored segments")
+    topics.add_argument("--dry-run", action="store_true", help="only report what would change")
+    topics.set_defaults(func=cmd_topics)
 
     nyt = sub.add_parser("backfill-nyt", help="rebuild NYT history from the Archive API")
     nyt.add_argument("--from", dest="start", type=_month, required=True, metavar="YYYY-MM")

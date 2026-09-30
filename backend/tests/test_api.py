@@ -218,3 +218,12 @@ def test_repeated_failures_mark_a_platform_broken_even_after_a_recent_success(cl
     youtube = next(p for p in client.get("/api/v1/status").json()["platforms"] if p["platform"] == "youtube")
     assert youtube["state"] == "error"
     assert {j["job"]: j["state"] for j in youtube["jobs"]}["youtube_comments"] == "error"
+
+
+def test_a_job_that_has_not_run_yet_does_not_hide_a_healthy_platform(client, seeded):
+    seeded.execute(
+        "INSERT INTO ingest_state (source, interval_s, last_success_at, consecutive_failures)"
+        " VALUES ('bluesky', 30, now(), 0)"
+    )  # bluesky_metrics has no row yet
+    bluesky = next(p for p in client.get("/api/v1/status").json()["platforms"] if p["platform"] == "bluesky")
+    assert bluesky["state"] == "ok"

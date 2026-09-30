@@ -73,9 +73,12 @@ jobs:
 
   production:
     needs: [build, staging]
-    # Runs after staging succeeds (or is disabled). Add a required reviewer to the "production"
-    # environment in the repository settings to make this wait for a manual approval.
-    if: ${{ always() && (needs.build.result == 'success' || inputs.tag) && needs.staging.result != 'failure' }}
+    # Opt-in: set the repository variable PRODUCTION_ENABLED=true once the production environment's
+    # secrets exist. Runs after staging succeeds (or is disabled). Add a required reviewer to the
+    # "production" environment to make it wait for a manual approval.
+    if: >-
+      ${{ always() && vars.PRODUCTION_ENABLED == 'true'
+          && (needs.build.result == 'success' || inputs.tag) && needs.staging.result != 'failure' }}
     runs-on: ubuntu-latest
     environment:
       name: production

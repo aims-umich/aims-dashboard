@@ -100,7 +100,10 @@ In the repository's **Settings**:
 3. After the first successful deploy, you can make the two container packages public (**Packages → aims-dashboard → Package settings → Change visibility**).
    This is not required, because the deploy logs the VM in to GHCR for each pull.
 
-Every push to `main` then runs CI, builds `linux/arm64` images on GitHub's arm64 runners, pushes them to GHCR, deploys to staging (if enabled), and waits for your approval to deploy to production.
+Then set the repository variable **`PRODUCTION_ENABLED`** to `true`.
+Every push to `main` runs CI, builds `linux/arm64` images on GitHub's arm64 runners, and pushes them to GHCR.
+With `PRODUCTION_ENABLED` set, it also deploys to staging (if enabled) and then to production (after your approval, if you added a reviewer).
+Without it, pushes only build images, and you deploy on the VM with `deploy/deploy.sh <commit-sha>`.
 To roll back, run **Actions → Deploy → Run workflow** with the commit SHA of a good build.
 
 The first deploy (and any manual one) can also be started on the VM:

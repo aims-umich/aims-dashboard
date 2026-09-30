@@ -197,3 +197,43 @@ def test_migrations_ship_inside_the_package(tmp_path):
     names = zipfile.ZipFile(next(tmp_path.glob("sentiment-*.whl"))).namelist()
     assert "sentiment/migrations/env.py" in names
     assert "sentiment/migrations/versions/0001_initial_schema.py" in names
+
+
+def test_legacy_mastodon_reads_account_repr_with_datetimes(tmp_path):
+    from sentiment.importer.legacy import mastodon_documents
+
+    fields = [
+        "label",
+        "id",
+        "created_at",
+        "language",
+        "uri",
+        "url",
+        "content",
+        "account",
+        "media_attachments",
+    ]
+    human = (
+        "{'id': 1, 'acct': 'alice@example.social', 'bot': False, 'created_at': datetime.datetime(2022, 1, 1)}"
+    )
+    bot = "{'id': 2, 'acct': 'newsbot@example.social', 'bot': True, 'created_at': datetime.datetime(2022, 1)}"
+    path = tmp_path / "posts.csv"
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for i, account in enumerate((human, bot)):
+            writer.writerow(
+                {
+                    "label": "neutral",
+                    "id": str(i),
+                    "created_at": "2024-11-14 16:14:04+00:00",
+                    "language": "en",
+                    "uri": f"https://example.social/statuses/{i}",
+                    "url": "",
+                    "content": "<p>nuclear power</p>",
+                    "account": account,
+                    "media_attachments": "[]",
+                }
+            )
+    docs = list(mastodon_documents([path]))
+    assert [d.author_handle for d in docs] == ["alice@example.social"]

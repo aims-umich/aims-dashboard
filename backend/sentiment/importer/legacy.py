@@ -10,7 +10,6 @@ it was collected against Meta's terms and must not be published.
 
 from __future__ import annotations
 
-import ast
 import csv
 import hashlib
 import logging
@@ -97,6 +96,13 @@ def guardian_documents(db_path: Path) -> Iterator[DocumentIn]:
         conn.close()
 
 
+def _repr_flag(field: str) -> re.Pattern[str]:
+    return re.compile(rf"'{field}':\s*True")
+
+
+_REPR_ACCT = re.compile(r"'acct':\s*'([^']+)'")
+
+
 def mastodon_documents(csv_paths: Iterable[Path]) -> Iterator[DocumentIn]:
     for path in csv_paths:
         for row in _rows(path):
@@ -104,12 +110,11 @@ def mastodon_documents(csv_paths: Iterable[Path]) -> Iterator[DocumentIn]:
             uri = row.get("uri") or row.get("url")
             if not text or not uri or not row.get("created_at"):
                 continue
-            try:
-                account = ast.literal_eval(row.get("account") or "{}")
-            except (ValueError, SyntaxError):
-                account = {}
-            if isinstance(account, dict) and (account.get("noindex") or account.get("bot")):
+            # The column is a Python repr that includes datetime(...) calls, so read the fields directly.
+            account = row.get("account") or ""
+            if _repr_flag("bot").search(account) or _repr_flag("noindex").search(account):
                 continue  # Same opt-out and bot rules as the live collector.
+            acct = _REPR_ACCT.search(account)
             lang = row.get("language") if row.get("language") not in ("", "nan") else None
             yield DocumentIn(
                 platform="mastodon",
@@ -117,7 +122,7 @@ def mastodon_documents(csv_paths: Iterable[Path]) -> Iterator[DocumentIn]:
                 kind="post",
                 published_at=_dt(row["created_at"]),
                 url=row.get("url") or uri,
-                author_handle=account.get("acct") if isinstance(account, dict) else None,
+                author_handle=acct.group(1) if acct else None,
                 body=text,
                 lang=lang,
                 segments=[SegmentIn(text, classify_relevance(text, lang=lang))],

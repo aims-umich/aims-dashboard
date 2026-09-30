@@ -21,4 +21,6 @@ updates:
       - { dependency-name: huggingface-hub, versions: [">=2"] }
       # sympy (a torch dependency) requires mpmath < 1.4.
       - { dependency-name: mpmath, versions: [">=1.4"] }
+      # pydantic pins pydantic-core exactly; it updates when pydantic does.
+      - { dependency-name: pydantic-core }
   - { package-ecosystem: docker, directory: /backend, schedule: { interval: monthly } }

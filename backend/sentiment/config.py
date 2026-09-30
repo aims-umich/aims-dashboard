@@ -32,7 +32,13 @@ class Settings(BaseSettings):
     healthchecks_slug_prefix: str = "dashboard"
 
     # Ingest
-    enabled_sources: str = "bluesky,mastodon,youtube,guardian,nyt"
+    # YouTube stays off: its standard API policy forbids cross-channel aggregation and derived
+    # metrics (Developer Policies III.E.2 and III.E.4.h); it needs YouTube Researcher Program access.
+    enabled_sources: str = "bluesky,mastodon,guardian,nyt"
+    # How long collected text may be kept, per platform ("platform=hours,..."). After that only the
+    # sentiment scores and dates remain. The Guardian's terms allow keeping content for 24 hours.
+    text_retention_hours: str = "guardian=24,nyt=24"
+    retention_interval_s: int = 3600
     user_agent: str = "aims-sentiment-dashboard/1.0 (+https://dashboard.aims-umich.com/about)"
 
     bluesky_jetstream_urls: str = (
@@ -111,6 +117,14 @@ class Settings(BaseSettings):
         if unknown:
             raise ValueError(f"Unknown sources in ENABLED_SOURCES: {', '.join(unknown)}")
         return names
+
+    @property
+    def retention_hours(self) -> dict[str, float]:
+        windows: dict[str, float] = {}
+        for item in split_csv(self.text_retention_hours):
+            platform, _, hours = item.partition("=")
+            windows[platform.strip()] = float(hours)
+        return windows
 
     @property
     def cors_origins(self) -> list[str]:

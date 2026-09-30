@@ -108,6 +108,8 @@ def mastodon_documents(csv_paths: Iterable[Path]) -> Iterator[DocumentIn]:
                 account = ast.literal_eval(row.get("account") or "{}")
             except (ValueError, SyntaxError):
                 account = {}
+            if isinstance(account, dict) and (account.get("noindex") or account.get("bot")):
+                continue  # Same opt-out and bot rules as the live collector.
             lang = row.get("language") if row.get("language") not in ("", "nan") else None
             yield DocumentIn(
                 platform="mastodon",

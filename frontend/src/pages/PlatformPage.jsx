@@ -145,6 +145,7 @@ export default function PlatformPage({ platform }) {
         isArticle={isArticle}
         fields={data?.engagement?.fields ?? []}
         title={isArticle ? "Recent articles" : `Recent ${unit}`}
+        note={config.listNote}
       />
     </div>
   )

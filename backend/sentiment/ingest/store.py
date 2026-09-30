@@ -26,9 +26,11 @@ UPSERT_DOCUMENT_SQL = """
     ON CONFLICT (platform, external_id) DO UPDATE SET
         metrics = CASE WHEN %(has_metrics)s THEN EXCLUDED.metrics ELSE documents.metrics END,
         metrics_updated_at = CASE WHEN %(has_metrics)s THEN now() ELSE documents.metrics_updated_at END,
-        url = COALESCE(EXCLUDED.url, documents.url),
-        author_handle = COALESCE(EXCLUDED.author_handle, documents.author_handle),
-        title = COALESCE(EXCLUDED.title, documents.title)
+        -- A purged document stays purged even when a later poll returns it again.
+        url = CASE WHEN documents.text_purged_at IS NULL THEN COALESCE(EXCLUDED.url, documents.url) END,
+        author_handle = CASE WHEN documents.text_purged_at IS NULL
+                             THEN COALESCE(EXCLUDED.author_handle, documents.author_handle) END,
+        title = CASE WHEN documents.text_purged_at IS NULL THEN COALESCE(EXCLUDED.title, documents.title) END
     RETURNING id, (xmax = 0) AS inserted
 """
 

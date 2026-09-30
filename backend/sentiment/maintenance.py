@@ -20,6 +20,7 @@ def recompute_relevance(database_url: str, *, dry_run: bool = False) -> dict[str
             """
             SELECT s.id, s.text, s.relevance, s.relevance_reason, d.lang, d.kind
             FROM segments s JOIN documents d ON d.id = s.document_id
+            WHERE d.text_purged_at IS NULL
             """
         ).fetchall()
         updates = []
@@ -51,8 +52,9 @@ DEMO_KINDS = {"youtube": "comment", "guardian": "article", "nyt": "article"}
 
 INSERT_DEMO_DOC = """
     INSERT INTO documents
-        (platform, external_id, kind, parent_id, url, title, author_handle, body, lang, published_at, metrics)
-    VALUES (%s, %s, %s, %s, 'https://example.com/demo', %s, 'demo-author', %s, 'en', %s, %s)
+        (platform, external_id, kind, parent_id, url, title, author_handle, body, lang, published_at, metrics,
+         metrics_updated_at)
+    VALUES (%s, %s, %s, %s, 'https://example.com/demo', %s, 'demo-author', %s, 'en', %s, %s, now())
     ON CONFLICT (platform, external_id) DO NOTHING RETURNING id
 """
 INSERT_DEMO_SEGMENT = """
@@ -134,3 +136,65 @@ def seed_demo(database_url: str, platforms: list[str], *, days: int = 90, per_da
                     created += 1
             conn.execute(MARK_DEMO_SOURCE, (platform,))
     return {"documents": created}
+
+
+async def backfill_nyt(
+    settings, start: tuple[int, int], end: tuple[int, int], *, replace_legacy: bool = False
+) -> dict[str, int]:
+    """Rebuild NYT history from the Archive API (real headlines, abstracts, and links), month by month.
+
+    With `replace_legacy`, the old GPT-written summaries are deleted once every month has loaded.
+    The API allows about 5 requests a minute, so months are spaced 12.5 seconds apart.
+    """
+    import asyncio
+
+    import httpx
+
+    from sentiment.db import async_pool
+    from sentiment.ingest.sources.nyt import REQUEST_SPACING_S, archive_month
+    from sentiment.ingest.store import save_documents
+
+    if not settings.nyt_api_key:
+        raise SystemExit("NYT_API_KEY is not set")
+    key = settings.nyt_api_key.get_secret_value()
+    months = []
+    year, month = start
+    while (year, month) <= end:
+        months.append((year, month))
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+
+    totals = {
+        "months": 0,
+        "articles": 0,
+        "kept": 0,
+        "new_documents": 0,
+        "new_segments": 0,
+        "legacy_deleted": 0,
+    }
+    pool = await async_pool(settings.database_url, max_size=2)
+    try:
+        async with httpx.AsyncClient(headers={"User-Agent": settings.user_agent}) as client:
+            for i, (y, m) in enumerate(months):
+                if i:
+                    await asyncio.sleep(REQUEST_SPACING_S)
+                articles, docs = await archive_month(client, key, y, m)
+                async with pool.connection() as conn, conn.transaction():
+                    saved = await save_documents(conn, docs)
+                    if saved.new_segments:
+                        await conn.execute(f"NOTIFY {NEW_SEGMENTS_CHANNEL}")
+                totals["months"] += 1
+                totals["articles"] += articles
+                totals["kept"] += len(docs)
+                totals["new_documents"] += saved.new_documents
+                totals["new_segments"] += saved.new_segments
+                label = f"{y}-{m:02d}"
+                print(f"{label}: {articles} articles, {len(docs)} mention nuclear, {saved.new_documents} new")
+        if replace_legacy:
+            async with pool.connection() as conn, conn.transaction():
+                cur = await conn.execute(
+                    "DELETE FROM documents WHERE platform = 'nyt' AND external_id LIKE 'legacy-%%'"
+                )
+                totals["legacy_deleted"] = cur.rowcount
+    finally:
+        await pool.close()
+    return totals

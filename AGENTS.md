@@ -45,6 +45,9 @@ Checks: `ruff check . && ruff format --check . && pytest` in `backend/`; `npm ru
 ## Rules and gotchas
 
 - **Official APIs only, within each platform's terms.** No scraping. Threads and X are out of scope.
+  YouTube is off: the standard API forbids aggregation and derived metrics (Developer Policies III.E.2, III.E.4.h); it needs YouTube Researcher Program access.
+  Guardian and NYT text is purged 24 hours after collection by the retention job (`TEXT_RETENTION_HOURS`); only scores and dates stay.
+  Mastodon `noindex` and bot accounts, and Bluesky accounts labeled `!no-unauthenticated`, are never shown.
   The old Playwright Threads scraper and its data (`backend/threads/*`, `backend/posts.db`) violated Meta's terms: never import, display, or publish them.
   `posts.db` was committed to the public repo before September 2026 and is still in git history.
 - Collected data never goes in git: it lives in Postgres and in encrypted backups. The old collector folders under `backend/` only hold untracked local legacy data.

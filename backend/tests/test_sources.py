@@ -76,9 +76,10 @@ def test_bluesky_distrusts_backdated_created_at():
 async def test_bluesky_metrics_refresh_updates_counts_and_drops_removed(settings, client, pool):
     kept = parse_event(f.jetstream_post("nuclear power rocks", rkey="3keep"))
     gone = parse_event(f.jetstream_post("nuclear power again", rkey="3gone"))
-    kept.published_at = gone.published_at = datetime.now(UTC)
+    hidden = parse_event(f.jetstream_post("nuclear power, quietly", rkey="3hide"))
+    kept.published_at = gone.published_at = hidden.published_at = datetime.now(UTC)
     async with pool.connection() as conn, conn.transaction():
-        await store.save_documents(conn, [kept, gone])
+        await store.save_documents(conn, [kept, gone, hidden])
     respx.get("https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts").respond(
         json={
             "posts": [
@@ -90,12 +91,19 @@ async def test_bluesky_metrics_refresh_updates_counts_and_drops_removed(settings
                     "quoteCount": 0,
                     "author": {"handle": "someone.bsky.social"},
                     "labels": [],
-                }
+                },
+                {
+                    "uri": hidden.external_id,
+                    "author": {"handle": "private.bsky.social", "labels": [{"val": "!no-unauthenticated"}]},
+                    "labels": [],
+                },
             ]
         }
     )
     result = await BlueskyMetricsJob(settings, client, pool).poll({})
-    assert result.deletions == [("bluesky", gone.external_id)]
+    assert sorted(result.deletions) == sorted(
+        [("bluesky", gone.external_id), ("bluesky", hidden.external_id)]
+    )
     assert result.metric_updates[0][2]["likes"] == 9
     async with pool.connection() as conn:
         await store.commit_run(conn, "bluesky_metrics", result, 3600)
@@ -118,6 +126,15 @@ def test_mastodon_parses_html_and_metrics():
     assert doc.author_handle == "tester@example.social"
     assert doc.metrics == {"replies": 1, "reposts": 2, "likes": 3, "sensitive": False, "has_media": False}
     assert doc.segments[0].relevance.status == RELEVANT
+
+
+def test_mastodon_skips_noindex_and_bot_accounts():
+    noindex = f.mastodon_status("20", "<p>nuclear power</p>")
+    noindex["account"]["noindex"] = True
+    bot = f.mastodon_status("21", "<p>nuclear power</p>")
+    bot["account"]["bot"] = True
+    assert parse_status(noindex, "m.s") is None
+    assert parse_status(bot, "m.s") is None
 
 
 def test_mastodon_skips_bridged_and_private_posts():

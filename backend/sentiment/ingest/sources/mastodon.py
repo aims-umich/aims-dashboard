@@ -2,6 +2,7 @@
 
 Each (instance, hashtag) pair keeps its own `min_id` cursor, so every poll only reads new posts.
 Posts bridged in from Bluesky are skipped because the Bluesky collector already has them.
+Accounts that opted out of indexing (`noindex`) and bot accounts are skipped.
 """
 
 from __future__ import annotations
@@ -35,12 +36,15 @@ def parse_status(status: dict[str, Any], instance: str) -> DocumentIn | None:
     uri = status.get("uri") or ""
     if any(host in uri for host in BRIDGE_HOSTS):
         return None
+    account = status.get("account") or {}
+    # Respect accounts that opted out of indexing, and leave out bots: automated feeds are not opinion.
+    if account.get("noindex") or account.get("bot"):
+        return None
     text = strip_html(status.get("content") or "")
     if status.get("spoiler_text"):
         text = f"{status['spoiler_text']}\n{text}".strip()
     if not text:
         return None
-    account = status.get("account") or {}
     acct = account.get("acct") or account.get("username")
     handle = acct if acct is None or "@" in acct else f"{acct}@{instance}"
     lang = status.get("language")

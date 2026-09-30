@@ -19,12 +19,12 @@ It started as a UROP Symposium project and now runs as a live service at `dashbo
 |---|---|---|
 | Bluesky | Jetstream firehose (no account needed); deletions honored as they arrive | Seconds |
 | Mastodon | Public hashtag timelines | 2 minutes |
-| YouTube | New nuclear-energy videos, then their comment threads (Data API v3) | 30 minutes |
-| The Guardian | Content API, scored sentence by sentence | 30 minutes |
-| New York Times | Article Search API (abstract and lead paragraph) | 1 hour |
+| The Guardian | Content API, scored sentence by sentence; text kept 24 hours | 30 minutes |
+| New York Times | Article Search API (abstract and lead paragraph); text kept 24 hours; history from the Archive API | 1 hour |
+| YouTube | Built, but **off**: the standard API forbids aggregation and derived metrics (Developer Policies III.E.2, III.E.4.h). Needs YouTube Researcher Program access | - |
 | Reddit | Official API; off until Reddit approves research access | 2 minutes |
 
-Every source uses its official API within its terms.
+Every source uses its official API within its terms, and a retention job enforces each platform's storage limits (after that the charts keep only scores).
 Threads and X are not collected.
 Posts are filtered before scoring: idioms ("the nuclear option"), weapons and geopolitics, medicine, and non-English text are excluded, so trends reflect discussion of nuclear energy.
 
@@ -72,6 +72,7 @@ Other commands:
 
 - `sentiment import-legacy guardian mastodon youtube nyt` - load the pre-2026 SQLite/CSV data (kept locally, never in git).
 - `sentiment relevance [--dry-run]` - re-apply the relevance rules after changing them.
+- `sentiment backfill-nyt --from 2021-01 --to 2025-12 --replace-legacy` - rebuild NYT history from the Archive API.
 - `sentiment models list` / `sentiment models activate NAME [REVISION]` - choose which model the dashboard shows.
 
 ## Tests

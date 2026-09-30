@@ -66,6 +66,7 @@ export const PLATFORMS = {
     accent: "#052962",
     chartColor: "#4B7BC8",
     attribution: { text: "Powered by the Guardian", href: "https://open-platform.theguardian.com/" },
+    listNote: "Articles are listed for 24 hours after collection. After that, only their sentiment scores are kept.",
     logo: { light: "/guardian/The-Guardian-logo.png", dark: "/guardian/The-Guardian-logo-white.png" },
     unitLabel: "sentences",
   },
@@ -82,6 +83,7 @@ export const PLATFORMS = {
     accent: "#121212",
     chartColor: "#9CA3AF",
     attribution: { text: "Data provided by The New York Times", href: "https://developer.nytimes.com/" },
+    listNote: "Articles are listed for 24 hours after collection. After that, only their sentiment scores are kept.",
     unitLabel: "articles",
   },
 }

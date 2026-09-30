@@ -260,7 +260,11 @@ class BlueskyMetricsJob(Job):
             for uri in chunk:
                 post = found.get(uri)
                 labels = {label.get("val") for label in (post or {}).get("labels", [])}
-                if post is None or labels & HIDE_LABELS:
+                author_labels = {
+                    label.get("val") for label in ((post or {}).get("author") or {}).get("labels", [])
+                }
+                # "!no-unauthenticated": the author asked not to be shown to logged-out viewers.
+                if post is None or labels & HIDE_LABELS or "!no-unauthenticated" in author_labels:
                     deletions.append((PLATFORM, uri))
                     continue
                 updates.append(

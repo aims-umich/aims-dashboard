@@ -27,7 +27,7 @@ CLAIM_SQL = """
     SELECT s.id, s.text, d.collected_at
     FROM segments s
     JOIN documents d ON d.id = s.document_id
-    WHERE s.relevance = 'relevant'
+    WHERE s.relevance = 'relevant' AND s.text <> ''
       AND NOT EXISTS (SELECT 1 FROM predictions p WHERE p.segment_id = s.id AND p.model_id = %(model_id)s)
     ORDER BY s.id DESC
     LIMIT %(limit)s

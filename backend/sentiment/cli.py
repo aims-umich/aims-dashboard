@@ -59,6 +59,22 @@ def cmd_seed_demo(_: argparse.Namespace) -> None:
     print(json.dumps(seed_demo(settings.database_url, settings.sources)))
 
 
+def _month(value: str) -> tuple[int, int]:
+    year, _, month = value.partition("-")
+    if not (year.isdigit() and month.isdigit() and 1 <= int(month) <= 12):
+        raise argparse.ArgumentTypeError("use YYYY-MM")
+    return int(year), int(month)
+
+
+def cmd_backfill_nyt(args: argparse.Namespace) -> None:
+    from sentiment.maintenance import backfill_nyt
+
+    totals = asyncio.run(
+        backfill_nyt(get_settings(), args.start, args.end, replace_legacy=args.replace_legacy)
+    )
+    print(json.dumps(totals))
+
+
 def cmd_models(args: argparse.Namespace) -> None:
     with connect(get_settings().database_url) as conn:
         if args.action == "activate":
@@ -101,6 +117,14 @@ def build_parser() -> argparse.ArgumentParser:
     relevance = sub.add_parser("relevance", help="re-apply the relevance rules to stored segments")
     relevance.add_argument("--dry-run", action="store_true", help="only report what would change")
     relevance.set_defaults(func=cmd_relevance)
+
+    nyt = sub.add_parser("backfill-nyt", help="rebuild NYT history from the Archive API")
+    nyt.add_argument("--from", dest="start", type=_month, required=True, metavar="YYYY-MM")
+    nyt.add_argument("--to", dest="end", type=_month, required=True, metavar="YYYY-MM")
+    nyt.add_argument(
+        "--replace-legacy", action="store_true", help="then delete the old GPT-written NYT summaries"
+    )
+    nyt.set_defaults(func=cmd_backfill_nyt)
 
     sub.add_parser("seed-demo", help="fill a dev/CI database with fake data").set_defaults(func=cmd_seed_demo)
 

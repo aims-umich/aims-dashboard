@@ -219,7 +219,7 @@ def words(conn: psycopg.Connection, platform: Platform, range_key: str, sample: 
     since, _ = range_bounds(range_key)
     rows = conn.execute(
         f"""
-        SELECT s.text, p.label {SCORED_FROM}
+        SELECT s.text, p.label {SCORED_FROM} AND s.text <> ''
         ORDER BY d.published_at DESC LIMIT %(sample)s
         """,
         _params(platform, since) | {"sample": sample},
@@ -284,7 +284,9 @@ def posts(
                         WHEN agg.p_neu >= agg.p_neg THEN 1 ELSE 0 END AS label
         ) lbl
         LEFT JOIN documents parent ON parent.id = d.parent_id
-        WHERE d.platform = %(platform)s AND d.kind = ANY(%(kinds)s)
+        WHERE d.platform = %(platform)s AND d.kind = ANY(%(kinds)s) AND d.text_purged_at IS NULL
+          -- Bluesky posts are listed only once the metrics job has checked the author's opt-outs.
+          AND (d.platform <> 'bluesky' OR d.metrics_updated_at IS NOT NULL)
           AND (%(before_ts)s::timestamptz IS NULL
                OR (d.published_at, d.id) < (%(before_ts)s::timestamptz, %(before_id)s::bigint))
           AND agg.segments > 0
@@ -334,13 +336,15 @@ def ingest_states(conn: psycopg.Connection) -> dict[str, dict[str, Any]]:
 def scorer_status(conn: psycopg.Connection) -> dict[str, Any]:
     model = active_model(conn)
     if model is None:
-        backlog = conn.execute("SELECT count(*) AS n FROM segments WHERE relevance = 'relevant'").fetchone()
+        backlog = conn.execute(
+            "SELECT count(*) AS n FROM segments WHERE relevance = 'relevant' AND text <> ''"
+        ).fetchone()
         return {"model": None, "backlog": backlog["n"], "last_scored_at": None}
     row = conn.execute(
         """
         SELECT
           (SELECT count(*) FROM segments s
-            WHERE s.relevance = 'relevant'
+            WHERE s.relevance = 'relevant' AND s.text <> ''
               AND NOT EXISTS (SELECT 1 FROM predictions p WHERE p.segment_id = s.id AND p.model_id = %(m)s))
             AS backlog,
           (SELECT max(scored_at) FROM predictions WHERE model_id = %(m)s) AS last_scored_at

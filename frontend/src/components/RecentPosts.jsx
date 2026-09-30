@@ -72,7 +72,7 @@ function PostRow({ item, fields, isArticle }) {
   )
 }
 
-export default function RecentPosts({ platform, fields, isArticle, title }) {
+export default function RecentPosts({ platform, fields, isArticle, title, note }) {
   const [sentiment, setSentiment] = useState("all")
   const query = `/platforms/${platform}/posts?limit=${PAGE}${sentiment === "all" ? "" : `&sentiment=${sentiment}`}`
   const { data, error } = usePolling(query)
@@ -98,7 +98,7 @@ export default function RecentPosts({ platform, fields, isArticle, title }) {
   return (
     <Card
       title={title}
-      subtitle="Newest first, with the model's label and confidence"
+      subtitle={note ?? "Newest first, with the model's label and confidence"}
       flush
       actions={
         <SegmentedControl

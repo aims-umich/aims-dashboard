@@ -23,9 +23,11 @@ FAIL_ALERT_AFTER = 3
 
 
 def build_jobs(settings: Settings, client: httpx.AsyncClient, pool: AsyncConnectionPool) -> list[Job]:
+    from sentiment.ingest.retention import RetentionJob
     from sentiment.ingest.sources import JOBS_BY_SOURCE
 
-    jobs: list[Job] = []
+    # Retention always runs: it enforces the platforms' storage terms even for disabled sources.
+    jobs: list[Job] = [RetentionJob(settings, client, pool)]
     for source in settings.sources:
         jobs.extend(job_cls(settings, client, pool) for job_cls in JOBS_BY_SOURCE[source])
     return jobs

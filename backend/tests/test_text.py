@@ -93,6 +93,34 @@ def test_weapons_and_military_texts_are_excluded(text):
 
 
 @pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        (
+            "Rafael Grossi, the International Atomic Energy Agency director, said Iran's uranium stockpile "
+            "enriched to 60% had reached 400 kilograms.",
+            "geopolitics",
+        ),
+        (
+            "Ms. Marakova said that Ukrainian forces had destroyed two Russian helicopters outside of Kyiv. "
+            "Russians took Chernobyl, Ukraine said.",
+            "geopolitics",
+        ),
+    ],
+)
+def test_agency_and_place_names_do_not_make_war_news_relevant(text, reason):
+    assert classify_relevance(text, lang="en") == Relevance(EXCLUDED, reason)
+
+
+def test_radioactive_waste_alone_does_not_make_an_article_about_energy():
+    sentences = [
+        "Scientists at Los Alamos injected subjects with plutonium in the 1940s.",
+        "The lab plans to store twice as much radioactive waste on site.",
+    ]
+    results = classify_article_sentences(sentences, title="The Los Alamos experiments", standfirst=None)
+    assert {r.reason for r in results} == {"off_topic_article"}
+
+
+@pytest.mark.parametrize(
     "text",
     [
         "Postdoc on electrochemical ammonia synthesis in ceramic reactors",

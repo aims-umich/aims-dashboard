@@ -177,7 +177,8 @@ _EXCLUSIONS: list[tuple[str, re.Pattern[str]]] = [
         "medicine",
         re.compile(
             r"\bnuclear\s+(?:medicine|magnetic\s+resonance|imaging|scans?|stress\s+tests?|cardiology)\b"
-            r"|\bnuclear\s+(?:membranes?|envelope|receptors?|pores?|dna|genome)\b",
+            r"|\bnuclear\s+(?:membranes?|envelope|receptors?|pores?|dna|genome|enzymes?|proteins?|factors?|"
+            r"lamina|matrix|localization|translocation|extracts?|fractions?|staining|division)\b",
             re.IGNORECASE,
         ),
     ),

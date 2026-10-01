@@ -96,6 +96,8 @@ DEMO_HIGHLIGHTS = {
     "budget": -1.0,
 }
 DEMO_KINDS = {"youtube": "comment", "guardian": "article", "nyt": "article"}
+# Guardian articles are scored sentence by sentence; their standfirst is shown but not scored.
+DEMO_STANDFIRST = "A demo standfirst: the scored sentences below come from the article body."
 
 INSERT_DEMO_DOC = """
     INSERT INTO documents
@@ -106,7 +108,7 @@ INSERT_DEMO_DOC = """
 """
 INSERT_DEMO_SEGMENT = """
     INSERT INTO segments (document_id, ordinal, text, relevance, topics)
-    VALUES (%s, 0, %s, 'relevant', %s) RETURNING id
+    VALUES (%s, %s, %s, 'relevant', %s) RETURNING id
 """
 INSERT_DEMO_EXPLANATION = """
     INSERT INTO explanations (segment_id, model_id, spans) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING
@@ -169,7 +171,11 @@ def seed_demo(database_url: str, platforms: list[str], *, days: int = 90, per_da
             parent = _demo_parent(conn, platform, now - timedelta(days=days))
             for day in range(days):
                 for n in range(rng.randint(1, per_day)):
-                    text, label = rng.choice(DEMO_TEXTS)
+                    sentences = (
+                        rng.sample(DEMO_TEXTS, rng.randint(2, 4))
+                        if platform == "guardian"
+                        else [rng.choice(DEMO_TEXTS)]
+                    )
                     metrics = (
                         {}
                         if kind == "article"
@@ -182,20 +188,23 @@ def seed_demo(database_url: str, platforms: list[str], *, days: int = 90, per_da
                     title = "Demo article about nuclear power" if kind == "article" else None
                     published = now - timedelta(days=day, minutes=rng.randint(0, 1439))
                     # Draw every random value before any early exit, so re-running is a no-op.
-                    confidence = rng.uniform(0.55, 0.99)
+                    confidences = [rng.uniform(0.55, 0.99) for _ in sentences]
+                    body = DEMO_STANDFIRST if platform == "guardian" else sentences[0][0]
                     doc = conn.execute(
                         INSERT_DEMO_DOC,
-                        (platform, f"demo-{day}-{n}", kind, parent, title, text, published, Jsonb(metrics)),
+                        (platform, f"demo-{day}-{n}", kind, parent, title, body, published, Jsonb(metrics)),
                     ).fetchone()
                     if doc is None:
                         continue
-                    segment = conn.execute(
-                        INSERT_DEMO_SEGMENT, (doc["id"], text, topics_for(text))
-                    ).fetchone()["id"]
-                    probs = [(1 - confidence) / 2] * 3
-                    probs[label] = confidence
-                    conn.execute(INSERT_DEMO_PREDICTION, (segment, model, label, *probs, confidence))
-                    if kind != "article":
+                    for ordinal, ((text, label), confidence) in enumerate(
+                        zip(sentences, confidences, strict=True)
+                    ):
+                        segment = conn.execute(
+                            INSERT_DEMO_SEGMENT, (doc["id"], ordinal, text, topics_for(text))
+                        ).fetchone()["id"]
+                        probs = [(1 - confidence) / 2] * 3
+                        probs[label] = confidence
+                        conn.execute(INSERT_DEMO_PREDICTION, (segment, model, label, *probs, confidence))
                         conn.execute(INSERT_DEMO_EXPLANATION, (segment, model, Jsonb(_demo_spans(text))))
                     created += 1
             conn.execute(MARK_DEMO_SOURCE, (platform,))

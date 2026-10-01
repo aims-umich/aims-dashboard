@@ -59,7 +59,7 @@ def test_energy_texts_are_relevant(text):
         ("Fires spread through Pacific Palisades overnight", "no_keyword"),
         ("Umineko Shouten In-store, Fukushima, Japan #Japan", "no_keyword"),
         ("NATO condemned the nuclear rhetoric from Russia over Kaliningrad", "weapons+geopolitics"),
-        ("China expands its nuclear stockpile, the Pentagon says", "geopolitics"),
+        ("China expands its nuclear stockpile, the Pentagon says", "weapons+geopolitics"),
         ("smr lol", "no_keyword"),
     ],
 )
@@ -67,6 +67,71 @@ def test_off_topic_texts_are_excluded_with_a_reason(text, reason):
     result = classify_relevance(text, lang="en")
     assert result.status == EXCLUDED
     assert result.reason == reason
+
+
+# Posts and NYT abstracts that leaked into the scores in September 2026.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Probably exaggerating a bit but without American technical support in virtually all aspects of the "
+        "UK's nuclear capability the capability to use them would diminish remarkably quickly.",
+        'Hegseth: "Their nuclear facilities have been destroyed." You just said we had to start this war '
+        "because the nuclear weapon posed an imminent threat.",
+        "To deal with chemical, biological radiological, nuclear or explosive (CBRNE) threats.",
+        "South Korea targets nuclear-powered submarine construction by mid-2030s, Lee says",
+        "UN chief calls for global shift away from nuclear weapons, saying the world has lived under the "
+        "nuclear shadow for more than eight decades.",
+        "Castle Romeo has to be the most famous photo of a nuclear explosion.",
+        "Anyone in the market for a nuclear bunker?",
+        "US says it conducted experiment aimed at improving ability to detect nuclear blast",
+        "Pretty much everyone across the US military in any kind of senior role has a degree. So if you want "
+        "to hire a lecturer in nuclear physics, you need a professor.",
+    ],
+)
+def test_weapons_and_military_texts_are_excluded(text):
+    assert classify_relevance(text, lang="en") == Relevance(EXCLUDED, "weapons")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Postdoc on electrochemical ammonia synthesis in ceramic reactors",
+        "A framework for immobilised-enzyme packed-bed reactor design applied to dihydroxyacetone production",
+        "Twenty-Five to Life made the list of Five Comforting Slice of Life Stories in Reactor Mag!",
+        "the arc reactor is still a thing of beauty",
+        'Rant time! If you are a Youtube "reactor" this is for you :)',
+        "Watching a reaction to The Iron Giant where the reactor realizes the giant has a digestive system",
+        "only just past the first mako reactor so not far yet",
+    ],
+)
+def test_reactors_that_are_not_nuclear_are_excluded(text):
+    assert classify_relevance(text, lang="en") == Relevance(EXCLUDED, "other_reactor")
+
+
+# Energy texts that mention war or weapons, which the military rule must keep.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The World awaited Armageddon; instead we began to use atomic energy not as a weapon, but as a "
+        "nearly limitless source of power.",
+        "52% of which were produced by renewables with 12-14% Nuclear in 2025. & ps I do blame them for wars",
+        "Calder Hall was designed with both electricity generation and plutonium production in mind, and was "
+        "closely connected to Britain's nuclear weapons program.",
+        "My Secret Wartime Chernobyl Trip | Kyle Hill #chernobyl #ukraine",
+        "There are several #NuclearPowerPlants in the affected areas, however Japan's nuclear authority said "
+        "there was no risk of radioactivity leaking. #NoNukes",
+        "In the latest example, the Energy Department will convert a shuttered Cold War-era uranium "
+        "enrichment facility into a data center campus and gas plants.",
+        "The Trump administration announced an agreement with Saudi Arabia on a civilian nuclear program, "
+        "designed to prevent the development of nuclear weapons.",
+        "Fortunately, few countries are dumping barrels of toxic nuclear or chemical waste in the oceans",
+        "Firing drones at a live reactor means you have lost every conventional fight in this war.",
+        "the nuclear reaction in the reactor core is what makes the heat",
+        "The reaction inside the reactor slowed after the scram.",
+    ],
+)
+def test_energy_texts_about_war_stay_relevant(text):
+    assert classify_relevance(text, lang="en").status == RELEVANT
 
 
 def test_declared_language_wins_and_heuristic_catches_undeclared():

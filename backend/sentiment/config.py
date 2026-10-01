@@ -101,7 +101,8 @@ class Settings(BaseSettings):
     scorer_threads: int = 1
     scorer_max_length: int = 512
     scorer_poll_interval_s: float = 30.0
-    # Per-word explanations for recent posts and comments, computed only while the scoring queue is empty.
+    # Per-word explanations for recent posts, comments and article sentences, computed only while the
+    # scoring queue is empty.
     scorer_explain: bool = True
     scorer_explain_days: int = 14
     scorer_explain_batch: int = 4

@@ -79,6 +79,23 @@ test("filtering recent posts by sentiment shows only that label", async ({ page 
   for (const label of labels) expect(label.trim()).toBe("Negative")
 })
 
+test("articles list the sentences they were scored on", async ({ page }) => {
+  await page.goto("/guardian")
+  const section = page.locator("#posts-h").locator("xpath=ancestor::section[1]")
+  const sentences = section.locator("article li")
+  await expect(sentences.first()).toBeVisible()
+  // Pin the card by position: once expanded it no longer matches a "Show more" filter.
+  const index = await section
+    .locator("article")
+    .evaluateAll((cards) => cards.findIndex((c) => /Show \d+ more/.test(c.textContent)))
+  expect(index).toBeGreaterThanOrEqual(0)
+  const card = section.locator("article").nth(index)
+  const shown = await card.locator("li").count()
+  await card.getByRole("button", { name: /^Show \d+ more/ }).click()
+  await expect(card.getByRole("button", { name: "Show fewer sentences" })).toHaveAttribute("aria-expanded", "true")
+  expect(await card.locator("li").count()).toBeGreaterThan(shown)
+})
+
 test("compare, topics, events and model pages render", async ({ page }) => {
   await page.goto("/compare")
   await expect(page.getByRole("heading", { level: 1, name: "Compare sources" })).toBeVisible()

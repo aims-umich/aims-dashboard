@@ -25,7 +25,13 @@ from urllib.parse import urlparse
 from sentiment.db import async_pool
 from sentiment.ingest.base import DocumentIn, SegmentIn
 from sentiment.ingest.store import save_documents
-from sentiment.text import classify_relevance, normalize, nuclear_sentences, strip_html
+from sentiment.text import (
+    classify_article_sentences,
+    classify_relevance,
+    normalize,
+    nuclear_sentences,
+    strip_html,
+)
 
 log = logging.getLogger(__name__)
 
@@ -88,7 +94,14 @@ def guardian_documents(db_path: Path) -> Iterator[DocumentIn]:
                 author_handle=None if row["author"] in (None, "N/A") else row["author"],
                 title=row["title"],
                 lang="en",
-                segments=[SegmentIn(s, classify_relevance(s, lang="en")) for s in sentences],
+                segments=[
+                    SegmentIn(s, r)
+                    for s, r in zip(
+                        sentences,
+                        classify_article_sentences(sentences, title=row["title"], standfirst=None),
+                        strict=True,
+                    )
+                ],
                 metrics={"word_count": _int(row["word_count"])} if _int(row["word_count"]) else {},
                 # The old collector only searched the US news section.
                 raw={"section": row["section"], "us": True},

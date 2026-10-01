@@ -20,7 +20,7 @@ from sentiment.ingest.base import (
     SourceDisabledError,
     raise_for_status,
 )
-from sentiment.text import classify_relevance, nuclear_sentences, strip_html
+from sentiment.text import classify_article_sentences, nuclear_sentences, strip_html
 
 PLATFORM = "guardian"
 SEARCH_URL = "https://content.guardianapis.com/search"
@@ -45,7 +45,9 @@ def parse_result(result: dict[str, Any]) -> DocumentIn | None:
     fields = result.get("fields") or {}
     body = fields.get("bodyText") or ""
     sentences = nuclear_sentences(body)
-    segments = [SegmentIn(s, classify_relevance(s, lang="en")) for s in sentences]
+    standfirst = strip_html(fields.get("trailText") or "") or None
+    relevance = classify_article_sentences(sentences, title=result.get("webTitle"), standfirst=standfirst)
+    segments = [SegmentIn(s, r) for s, r in zip(sentences, relevance, strict=True)]
     word_count = fields.get("wordcount")
     return DocumentIn(
         platform=PLATFORM,
@@ -55,7 +57,7 @@ def parse_result(result: dict[str, Any]) -> DocumentIn | None:
         url=result.get("webUrl"),
         author_handle=fields.get("byline") or None,
         title=result.get("webTitle"),
-        body=strip_html(fields.get("trailText") or "") or None,
+        body=standfirst,
         lang="en",
         segments=segments,
         metrics={"word_count": int(word_count)} if str(word_count or "").isdigit() else {},

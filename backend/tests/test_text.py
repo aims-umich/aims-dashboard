@@ -4,6 +4,9 @@ from sentiment.text import (
     EXCLUDED,
     NON_ENGLISH,
     RELEVANT,
+    Relevance,
+    article_context,
+    classify_article_sentences,
     classify_relevance,
     is_english,
     nuclear_sentences,
@@ -21,6 +24,7 @@ from sentiment.text import (
         "SMRs could change the grid",
         "Big day for #NuclearPower in Michigan",
         "Fusion energy startups raised $2B this year",
+        "Nuclear power plants need fewer enzymes than biofuel refineries",
         "Nuclear weapons and nuclear power are different things.",
         "Chernobyl still shapes how people see reactors",
         "Iran restarts the Bushehr nuclear power plant after repairs",
@@ -48,6 +52,8 @@ def test_energy_texts_are_relevant(text):
         ),
         ("A nuclear war would end civilization.", "weapons"),
         ("She works in nuclear medicine at the hospital.", "medicine"),
+        ("Nuclear enzyme discovery unlocks new paths to combat breast cancer", "medicine"),
+        ("The protein moves into the nuclear envelope during mitosis", "medicine"),
         ("Great weather today", "no_keyword"),
         ("jazz fusion night downtown", "no_keyword"),
         ("Fires spread through Pacific Palisades overnight", "no_keyword"),
@@ -75,6 +81,98 @@ def test_declared_language_wins_and_heuristic_catches_undeclared():
 def test_context_relevant_only_needs_english():
     assert classify_relevance("Great video, thanks!", context_relevant=True).status == RELEVANT
     assert classify_relevance("", context_relevant=True).status == EXCLUDED
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "<think> The post is about a startup wanting to build a nuclear-powered data center in Utah.",
+        "Nuclear power is great </think> Here is a reply you could post.",
+        "<|im_start|>assistant Nuclear energy is safe.",
+    ],
+)
+def test_machine_output_is_never_scored(text):
+    assert classify_relevance(text, lang="en") == Relevance(EXCLUDED, "machine_output")
+    assert classify_relevance(text, context_relevant=True) == Relevance(EXCLUDED, "machine_output")
+
+
+def test_thinking_about_nuclear_is_still_a_person():
+    assert classify_relevance("I think nuclear power is underrated.", lang="en").status == RELEVANT
+
+
+# Sentences from real Guardian articles that leaked into the scores in September 2026.
+OFF_TOPIC_ARTICLES = [
+    (
+        "Alexander Zverev clinches Laver Cup for Team Europe with victory over Learner Tien",
+        "At 10-11, he responded with a successful drop shot and lob combination, a nuclear forehand and "
+        "then another winning drop shot to clinch the final three points of the match.",
+    ),
+    (
+        "Heavy metal is about uplifting the downtrodden. So why is alleged abuse by Marilyn Manson so easily "
+        "forgotten?",
+        "In November, Nuclear Blast Records, the same label to which Manson signed in 2024, will release "
+        "a new album by Anselmo's other group, Down.",
+    ),
+    (
+        "Digger review - Tom Cruise's loudmouth oil tycoon goes hard in Alejandro G Iñárritu's eco-satire",
+        "He also angrily says that moving over to renewables, or nuclear, is simply not viable.",
+    ),
+]
+
+
+@pytest.mark.parametrize(("title", "sentence"), OFF_TOPIC_ARTICLES)
+def test_article_sentences_need_an_article_about_energy(title, sentence):
+    assert classify_relevance(sentence, lang="en").status == RELEVANT  # alone, the sentence looks fine
+    [result] = classify_article_sentences([sentence], title=title, standfirst=None)
+    assert result == Relevance(EXCLUDED, "off_topic_article")
+
+
+def test_geopolitical_articles_keep_only_energy_sentences():
+    sentences = [
+        "The initial steps would take four to five days, and talks on the nuclear programme would start "
+        "on the seventh day, he said.",
+        "Iran's Bushehr nuclear power plant was not affected, the agency said.",
+    ]
+    results = classify_article_sentences(
+        sentences,
+        title="Trump rejects Iran's seven-day peace deal to reopen strait of Hormuz",
+        standfirst="US president is said to expect renewed strikes after the midterms",
+    )
+    assert results == [Relevance(EXCLUDED, "geopolitics"), Relevance(RELEVANT)]
+
+
+@pytest.mark.parametrize(
+    ("title", "sentences"),
+    [
+        (
+            "New UK gas and oil projects are a 'no-brainer', says EDF boss",
+            [
+                "EDF Energy has about 8 gigawatts of low-carbon capacity in the UK, including eight "
+                "nuclear power plants.",
+                "It is building the much-delayed Hinkley Point C nuclear power station in Somerset.",
+            ],
+        ),
+        (
+            "Burnham's electricity grid idea is interesting - but it's not 'public control'",
+            ["A chunk has already been raided to back small modular nuclear reactors."],
+        ),
+        (
+            "Poland signs its first nuclear power plant contract",
+            ["Nuclear is the only way to quit coal, he said."],
+        ),
+    ],
+)
+def test_energy_articles_keep_their_nuclear_sentences(title, sentences):
+    results = classify_article_sentences(sentences, title=title, standfirst=None)
+    assert all(r.status == RELEVANT for r in results)
+
+
+def test_article_context_reads_the_headline_and_every_sentence():
+    assert article_context("Reactor restarts in Michigan", None, []).about_energy
+    assert article_context("Budget news", "A standfirst", ["A new nuclear plant opens."]).about_energy
+    assert not article_context("Budget news", None, ["A nuclear forehand won it."]).about_energy
+    assert article_context("Iran talks stall", None, []).geopolitical
+    assert not article_context("Iran restarts its Bushehr nuclear power plant", None, []).geopolitical
 
 
 def test_strip_html_keeps_block_breaks_and_unescapes():

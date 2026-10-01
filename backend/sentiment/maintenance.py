@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from collections import Counter
+from itertools import groupby
+from typing import Any
 
 from sentiment.db import NEW_SEGMENTS_CHANNEL, connect
-from sentiment.text import classify_relevance
+from sentiment.text import Relevance, classify_article_sentences, classify_relevance, classify_with_headline
+
+
+def classify_document(doc: dict[str, Any], texts: list[str]) -> list[Relevance]:
+    """Classify a stored document's segments exactly as its collector did at ingest time."""
+    if doc["kind"] == "comment":
+        return [classify_relevance(t, context_relevant=True) for t in texts]
+    if doc["platform"] == "guardian" and doc["kind"] == "article":
+        return classify_article_sentences(texts, title=doc["title"], standfirst=doc["body"])
+    if doc["platform"] == "nyt":
+        return [classify_with_headline(t, doc["title"]) for t in texts]
+    return [classify_relevance(t, lang=doc["lang"]) for t in texts]
 
 
 def recompute_relevance(database_url: str, *, dry_run: bool = False) -> dict[str, int]:
@@ -18,19 +31,21 @@ def recompute_relevance(database_url: str, *, dry_run: bool = False) -> dict[str
     with connect(database_url) as conn:
         rows = conn.execute(
             """
-            SELECT s.id, s.text, s.relevance, s.relevance_reason, d.lang, d.kind
+            SELECT s.id, s.document_id, s.text, s.relevance, s.relevance_reason,
+                   d.platform, d.kind, d.lang, d.title, d.body
             FROM segments s JOIN documents d ON d.id = s.document_id
             WHERE d.text_purged_at IS NULL
+            ORDER BY s.document_id, s.ordinal
             """
         ).fetchall()
         updates = []
-        for row in rows:
-            result = classify_relevance(
-                row["text"], lang=row["lang"], context_relevant=row["kind"] == "comment"
-            )
-            if (result.status, result.reason) != (row["relevance"], row["relevance_reason"]):
-                changes[f"{row['relevance']}->{result.status}"] += 1
-                updates.append((result.status, result.reason, row["id"]))
+        for _, group in groupby(rows, key=lambda row: row["document_id"]):
+            segments = list(group)
+            results = classify_document(segments[0], [row["text"] for row in segments])
+            for row, result in zip(segments, results, strict=True):
+                if (result.status, result.reason) != (row["relevance"], row["relevance_reason"]):
+                    changes[f"{row['relevance']}->{result.status}"] += 1
+                    updates.append((result.status, result.reason, row["id"]))
         if updates and not dry_run:
             with conn.transaction(), conn.cursor() as cur:
                 cur.executemany(

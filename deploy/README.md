@@ -199,6 +199,8 @@ docker compose logs -f --since 1h ingest  # collector logs (JSON)
 docker compose restart scorer             # restart one service
 docker compose run --rm ingest relevance --dry-run   # preview relevance-rule changes after a deploy
 docker compose run --rm ingest relevance             # apply them
+docker compose run --rm ingest topics --dry-run      # preview topic-rule changes
+docker compose run --rm ingest topics                # apply them (also needed once after migration 0003)
 docker compose run --rm ingest models list           # models and prediction counts
 ```
 

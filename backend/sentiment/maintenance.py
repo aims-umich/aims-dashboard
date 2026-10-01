@@ -77,11 +77,24 @@ def recompute_topics(database_url: str, *, dry_run: bool = False) -> dict[str, i
 DEMO_TEXTS = (
     ("Nuclear power keeps the grid clean and reliable.", 2),
     ("The new reactor design looks promising for cheap clean energy.", 2),
+    ("Fusion research keeps getting closer to net energy.", 2),
     ("Regulators are reviewing the plant's license renewal this month.", 1),
     ("Utilities discussed nuclear energy costs at the hearing.", 1),
+    ("Data centers want small modular reactors for AI power.", 1),
     ("Spent fuel storage at the plant still worries residents.", 0),
     ("The reactor outage raised prices and safety concerns.", 0),
+    ("The SMR project ran billions over budget.", 0),
 )
+# Words the demo explanations highlight: + pushed toward positive, - toward negative.
+DEMO_HIGHLIGHTS = {
+    "clean": 1.0,
+    "reliable": 0.7,
+    "promising": 1.0,
+    "closer": 0.8,
+    "worries": -1.0,
+    "concerns": -0.8,
+    "budget": -1.0,
+}
 DEMO_KINDS = {"youtube": "comment", "guardian": "article", "nyt": "article"}
 
 INSERT_DEMO_DOC = """
@@ -92,8 +105,21 @@ INSERT_DEMO_DOC = """
     ON CONFLICT (platform, external_id) DO NOTHING RETURNING id
 """
 INSERT_DEMO_SEGMENT = """
-    INSERT INTO segments (document_id, ordinal, text, relevance) VALUES (%s, 0, %s, 'relevant') RETURNING id
+    INSERT INTO segments (document_id, ordinal, text, relevance, topics)
+    VALUES (%s, 0, %s, 'relevant', %s) RETURNING id
 """
+INSERT_DEMO_EXPLANATION = """
+    INSERT INTO explanations (segment_id, model_id, spans) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING
+"""
+
+
+def _demo_spans(text: str) -> list[list[float]]:
+    lowered = text.lower()
+    return [
+        [lowered.index(w), lowered.index(w) + len(w), s] for w, s in DEMO_HIGHLIGHTS.items() if w in lowered
+    ]
+
+
 INSERT_DEMO_PREDICTION = """
     INSERT INTO predictions (segment_id, model_id, label, p_neg, p_neu, p_pos, confidence)
     VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -163,10 +189,14 @@ def seed_demo(database_url: str, platforms: list[str], *, days: int = 90, per_da
                     ).fetchone()
                     if doc is None:
                         continue
-                    segment = conn.execute(INSERT_DEMO_SEGMENT, (doc["id"], text)).fetchone()["id"]
+                    segment = conn.execute(
+                        INSERT_DEMO_SEGMENT, (doc["id"], text, topics_for(text))
+                    ).fetchone()["id"]
                     probs = [(1 - confidence) / 2] * 3
                     probs[label] = confidence
                     conn.execute(INSERT_DEMO_PREDICTION, (segment, model, label, *probs, confidence))
+                    if kind != "article":
+                        conn.execute(INSERT_DEMO_EXPLANATION, (segment, model, Jsonb(_demo_spans(text))))
                     created += 1
             conn.execute(MARK_DEMO_SOURCE, (platform,))
     return {"documents": created}

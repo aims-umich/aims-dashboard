@@ -40,13 +40,13 @@ RECHECK_SQL = """
     WHERE NOT EXISTS (SELECT 1 FROM predictions p WHERE p.segment_id = id AND p.model_id = %(model_id)s)
 """
 
-# Recent posts and comments (the kinds listed as individual texts on the site), newest first.
+# Recent scored texts that the site lists (posts, comments and article sentences), newest first.
 EXPLAIN_CLAIM_SQL = """
     SELECT s.id, s.text
     FROM segments s
     JOIN documents d ON d.id = s.document_id
     JOIN predictions p ON p.segment_id = s.id AND p.model_id = %(model_id)s
-    WHERE s.relevance = 'relevant' AND s.text <> '' AND d.kind IN ('post', 'comment')
+    WHERE s.relevance = 'relevant' AND s.text <> '' AND d.kind IN ('post', 'comment', 'article')
       AND d.published_at > now() - make_interval(days => %(days)s)
       AND NOT EXISTS (SELECT 1 FROM explanations e WHERE e.segment_id = s.id AND e.model_id = %(model_id)s)
     ORDER BY d.published_at DESC
@@ -131,7 +131,7 @@ def score_batch(conn: psycopg.Connection, classifier: Classifier, model_id: int,
 def explain_batch(
     conn: psycopg.Connection, classifier: Classifier, model_id: int, limit: int, days: int
 ) -> int:
-    """Explain one batch of recent scored posts. Returns 0 when the classifier cannot explain."""
+    """Explain one batch of recent scored texts. Returns 0 when the classifier cannot explain."""
     explain = getattr(classifier, "explain", None)
     if explain is None:
         return 0

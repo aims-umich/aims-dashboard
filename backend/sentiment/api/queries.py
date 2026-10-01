@@ -389,12 +389,7 @@ def posts(
                COALESCE(d.body, (SELECT s.text FROM segments s WHERE s.document_id = d.id
                                  AND s.relevance = 'relevant' ORDER BY s.ordinal LIMIT 1)) AS body,
                lbl.label, agg.p_neg, agg.p_neu, agg.p_pos, agg.segments,
-               parent.title AS parent_title, parent.url AS parent_url,
-               (SELECT e.spans FROM segments s
-                JOIN explanations e ON e.segment_id = s.id
-                     AND e.model_id = (SELECT id FROM models WHERE is_active)
-                WHERE s.document_id = d.id AND s.relevance = 'relevant' AND s.text = COALESCE(d.body, s.text)
-                ORDER BY s.ordinal LIMIT 1) AS highlights
+               parent.title AS parent_title, parent.url AS parent_url
         FROM documents d
         CROSS JOIN LATERAL (
             SELECT avg(p.p_neg) AS p_neg, avg(p.p_neu) AS p_neu, avg(p.p_pos) AS p_pos, count(*) AS segments
@@ -422,9 +417,14 @@ def posts(
     ).fetchall()
     has_more = len(rows) > limit
     rows = rows[:limit]
+    scored = _scored_sentences(conn, [row["id"] for row in rows])
     items = []
     for row in rows:
         probs = (row["p_neg"], row["p_neu"], row["p_pos"])
+        sentences = scored.get(row["id"], [])
+        # A post is its one scored text, so its highlights go straight onto `text`. An article was scored
+        # sentence by sentence, and those sentences are not what `text` shows, so they are listed instead.
+        inline = len(sentences) == 1 and sentences[0]["text"] == row["body"]
         items.append(
             {
                 "id": row["id"],
@@ -438,8 +438,9 @@ def posts(
                 "confidence": round(float(max(probs)), 4),
                 "probabilities": dict(zip(LABELS, (round(float(p), 4) for p in probs), strict=True)),
                 "segments": row["segments"],
-                # Words that pushed the label, as [start, end, score] offsets into `text` (posts only).
-                "highlights": row["highlights"] if row["segments"] == 1 else None,
+                # Words that pushed the label, as [start, end, score] offsets into `text`.
+                "highlights": sentences[0]["highlights"] if inline else None,
+                "sentences": None if inline else sentences,
                 "metrics": row["metrics"],
                 "origin": row["origin"],
                 "parent": {"title": row["parent_title"], "url": row["parent_url"]}
@@ -452,6 +453,34 @@ def posts(
         last = rows[-1]
         next_cursor = f"{last['published_at'].isoformat()}_{last['id']}"
     return {"platform": platform.key, "items": items, "next_cursor": next_cursor}
+
+
+def _scored_sentences(conn: psycopg.Connection, document_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    """Each document's relevant, scored segments in reading order, with their label and highlights."""
+    out: dict[int, list[dict[str, Any]]] = {}
+    if not document_ids:
+        return out
+    rows = conn.execute(
+        """
+        SELECT s.document_id, s.text, p.label, p.confidence, e.spans
+        FROM segments s
+        JOIN predictions p ON p.segment_id = s.id AND p.model_id = (SELECT id FROM models WHERE is_active)
+        LEFT JOIN explanations e ON e.segment_id = s.id AND e.model_id = p.model_id
+        WHERE s.document_id = ANY(%(ids)s) AND s.relevance = 'relevant'
+        ORDER BY s.document_id, s.ordinal
+        """,
+        {"ids": document_ids},
+    ).fetchall()
+    for row in rows:
+        out.setdefault(row["document_id"], []).append(
+            {
+                "text": row["text"],
+                "sentiment": LABELS[row["label"]],
+                "confidence": round(float(row["confidence"]), 4),
+                "highlights": row["spans"],
+            }
+        )
+    return out
 
 
 def strip(

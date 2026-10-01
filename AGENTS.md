@@ -19,7 +19,7 @@ It began as a UROP Symposium demo (tagged `v0-local-demo`) and was rebuilt in Se
 
 - `backend/` - Python 3.12 package `sentiment` (CLI: `sentiment <command>`).
   - `ingest/` - collectors, one isolated job per feed (`sources/`: bluesky, mastodon, youtube, reddit, guardian, nyt), idempotent upserts, cursors in `ingest_state`.
-  - `scorer/` - loads one `Classifier` (`classifier/`), claims unscored segments with `SKIP LOCKED`, wakes on `LISTEN/NOTIFY new_segments`. When the queue is empty it explains recent posts and comments (integrated gradients, `explanations` table).
+  - `scorer/` - loads one `Classifier` (`classifier/`), claims unscored segments with `SKIP LOCKED`, wakes on `LISTEN/NOTIFY new_segments`. When the queue is empty it explains recent posts, comments and article sentences (integrated gradients, `explanations` table).
   - `api/` - read-only FastAPI (`/api/v1/...`, `/healthz`).
   - `text.py` - cleanup, sentence splitting, language checks, and the nuclear-energy relevance rules (Guardian sentences are judged with their article's context).
   - `topics.py` - keyword rules for the nine topics, stored per segment in `segments.topics`.

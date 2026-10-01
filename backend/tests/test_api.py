@@ -353,6 +353,22 @@ def test_posts_carry_word_highlights_once_explained(client, seeded):
     by_text = {p["text"]: p["highlights"] for p in items}
     assert by_text["nuclear power is good"] == [[17, 21, 1.0]]
     assert by_text["nuclear plants exist"] is None  # 400 days old: never explained
+    assert all(p["sentences"] is None for p in items)
+
+
+def test_articles_list_their_scored_sentences_with_highlights(client, seeded):
+    clf = FakeClassifier()
+    model_id = register_model(seeded, clf.info)
+    while explain_batch(seeded, clf, model_id, 10, days=14):
+        pass
+    article = client.get("/api/v1/platforms/guardian/posts").json()["items"][0]
+    assert article["highlights"] is None
+    assert [(s["text"], s["sentiment"]) for s in article["sentences"]] == [
+        ("a good reactor", "positive"),
+        ("a bad reactor", "negative"),
+        ("a good plant", "positive"),
+    ]
+    assert article["sentences"][0]["highlights"] == [[2, 6, 1.0]]
 
 
 def test_series_by_month_and_week(client):

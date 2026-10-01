@@ -6,6 +6,10 @@ import { defineConfig } from "vite"
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: {
+    // Vercel sets VERCEL=1 while building; Web Analytics only exists there, so local builds skip it.
+    "import.meta.env.ON_VERCEL": JSON.stringify(process.env.VERCEL === "1"),
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react"
 import React from "react"
 import ReactDOM from "react-dom/client"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
@@ -30,5 +31,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         </Route>
       </Routes>
     </BrowserRouter>
+    {import.meta.env.ON_VERCEL && <Analytics />}
   </React.StrictMode>,
 )

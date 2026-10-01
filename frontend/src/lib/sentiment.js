@@ -1,9 +1,12 @@
 export const SENTIMENTS = ["positive", "neutral", "negative"]
 
-export const SENTIMENT_COLORS = {
-  positive: "#10B981",
-  neutral: "#6B7280",
-  negative: "#EF4444",
+// Canonical API label order is 0 = negative, 1 = neutral, 2 = positive.
+export const LABEL_KEYS = ["negative", "neutral", "positive"]
+
+export const SENTIMENT_VARS = {
+  positive: "var(--pos)",
+  neutral: "var(--neu)",
+  negative: "var(--neg)",
 }
 
 export const SENTIMENT_LABELS = {

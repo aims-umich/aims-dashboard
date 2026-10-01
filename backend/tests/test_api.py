@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 from psycopg.types.json import Jsonb
 
 from sentiment.api.app import create_app
-from sentiment.scorer.service import register_model, score_batch
+from sentiment.api.queries import distinctive_words, spikes
+from sentiment.scorer.service import explain_batch, register_model, score_batch
+from sentiment.topics import topics_for
 from tests.fake import FakeClassifier
 
 NOW = datetime.now(UTC)
@@ -36,8 +38,9 @@ def add_doc(db, platform, external_id, kind, published_at, texts, *, metrics=Non
         texts.items() if isinstance(texts, dict) else ((t, "relevant") for t in texts)
     ):
         db.execute(
-            "INSERT INTO segments (document_id, ordinal, text, relevance) VALUES (%s, %s, %s, %s)",
-            (doc, i, text, relevance),
+            "INSERT INTO segments (document_id, ordinal, text, relevance, topics)"
+            " VALUES (%s, %s, %s, %s, %s)",
+            (doc, i, text, relevance, topics_for(text)),
         )
     return doc
 
@@ -227,3 +230,135 @@ def test_a_job_that_has_not_run_yet_does_not_hide_a_healthy_platform(client, see
     )  # bluesky_metrics has no row yet
     bluesky = next(p for p in client.get("/api/v1/status").json()["platforms"] if p["platform"] == "bluesky")
     assert bluesky["state"] == "ok"
+
+
+def test_24h_range_uses_hourly_buckets(client):
+    body = client.get("/api/v1/platforms/mastodon/summary", params={"range": "24h"}).json()
+    assert body["bucket"] == "hour"
+    assert body["totals"]["documents"] == 1
+    assert body["trend"][-1]["bucket"] == NOW.strftime("%Y-%m-%dT%H:00:00Z")
+    assert 24 <= len(body["trend"]) <= 25
+
+
+def test_activity_counts_weekday_hours_and_the_hours_we_were_collecting(client):
+    activity = client.get("/api/v1/platforms/mastodon/summary", params={"range": "7d"}).json()["activity"]
+    assert activity["window_days"] == 28
+    assert sum(map(sum, activity["counts"])) == 2  # the excluded idiom and the 400-day-old post do not count
+    one_hour_ago = NOW - timedelta(hours=1)
+    assert activity["counts"][one_hour_ago.weekday()][one_hour_ago.hour] >= 1
+    assert sum(map(sum, activity["slots"])) == 28 * 24 or sum(map(sum, activity["slots"])) == 28 * 24 + 1
+
+
+def test_engagement_by_sentiment(client):
+    engagement = client.get("/api/v1/platforms/mastodon/summary", params={"range": "30d"}).json()[
+        "engagement"
+    ]
+    assert engagement["by_sentiment"]["positive"]["n"] == 1
+    assert engagement["by_sentiment"]["positive"]["likes"]["mean"] == 4
+    assert engagement["by_sentiment"]["negative"]["reposts"]["mean"] == 2
+
+
+def test_strip_lists_every_scored_text_of_the_last_day(client):
+    body = client.get("/api/v1/strip").json()
+    mastodon = next(p for p in body["platforms"] if p["platform"] == "mastodon")
+    assert mastodon["count"] == 1
+    [[stamp, label, confidence]] = mastodon["items"]
+    assert label == 2 and confidence == 80
+    assert abs(stamp - (NOW - timedelta(hours=1)).timestamp()) < 5
+    assert mastodon["collecting_since"] is not None
+
+
+def test_distinctive_words_favor_words_used_mostly_on_one_side():
+    from collections import Counter
+
+    positive = Counter({"clean": 30, "power": 40, "safe": 12})
+    negative = Counter({"waste": 25, "power": 38, "risk": 10})
+    result = distinctive_words(positive, negative, positive + negative)
+    assert [w["word"] for w in result["positive"]][:2] == ["clean", "safe"]
+    assert [w["word"] for w in result["negative"]][:2] == ["waste", "risk"]
+    assert "power" not in [w["word"] for w in result["positive"][:2] + result["negative"][:2]]
+
+
+def test_words_include_label_counts_in_the_cloud(client):
+    cloud = client.get("/api/v1/platforms/mastodon/words").json()["cloud"]
+    waste = next(w for w in cloud if w["value"] == "waste")
+    assert (waste["positive"], waste["negative"]) == (0, 1)
+
+
+def test_topics_count_share_sentiment_and_platforms(client):
+    body = client.get("/api/v1/topics", params={"range": "30d"}).json()
+    waste = next(t for t in body["topics"] if t["id"] == "waste")
+    assert body["texts"] == 6
+    assert waste["count"] == 1 and waste["sentiment"]["negative"] == 1
+    assert waste["share"] == round(1 / 6, 4)
+    assert waste["by_platform"] == {"mastodon": {"n": 1, "net": -1.0}}
+    assert len(waste["weekly"]) == 12 and sum(waste["weekly"]) == 1
+    assert body["topics"][0]["id"] == "data-centers"
+
+
+def test_topic_detail_and_unknown_topic(client, db):
+    add_doc(db, "mastodon", "m5", "post", NOW - timedelta(hours=3), ["fusion power is good"])
+    add_doc(db, "mastodon", "m6", "post", NOW - timedelta(hours=4), ["fusion is bad"])
+    clf = FakeClassifier()
+    model_id = register_model(db, clf.info)
+    while score_batch(db, clf, model_id, 50):
+        pass
+    db.execute("UPDATE documents SET metrics_updated_at = now()")
+    body = client.get("/api/v1/topics/fusion", params={"range": "7d"}).json()
+    assert sum(w["count"] for w in body["weeks"]) == 2
+    assert [e["text"] for e in body["examples"]] == [
+        "fusion power is good"
+    ]  # the negative one is not sure enough
+    assert client.get("/api/v1/topics/astrology").status_code == 404
+
+
+def test_spikes_flag_volume_and_sentiment_breaks_and_match_events():
+    quiet = [2, 3, 2]  # negative, neutral, positive
+    counts = {
+        "nyt": {f"2022-{m:02d}": quiet for m in range(1, 8)}
+        | {"2022-08": [30, 15, 5]}  # the Zaporizhzhia month: volume spike, matches event 2
+        | {"2022-09": quiet, "2022-10": quiet, "2022-11": quiet, "2022-12": [1, 3, 11]},
+    }
+    found = {(s["month"], s["kind"]): s for s in spikes(counts)}
+    assert found[("2022-08", "volume")]["event"] == 2
+    assert found[("2022-08", "volume")]["ratio"] == pytest.approx(50 / 7, abs=0.01)
+    assert found[("2022-12", "sentiment")]["event"] == 3
+    assert ("2022-05", "volume") not in found
+
+
+def test_events_endpoint_lists_every_event_for_the_focus_platform(client):
+    body = client.get("/api/v1/events", params={"platform": "mastodon"}).json()
+    assert body["platform"] == "mastodon"
+    assert len(body["events"]) == 9 and body["events"][0]["verdict"] == "no_data"
+    assert body["months"][-1]["month"] == NOW.strftime("%Y-%m")
+    assert client.get("/api/v1/events", params={"platform": "myspace"}).status_code == 404
+
+
+def test_model_overview(client):
+    body = client.get("/api/v1/model").json()
+    assert body["model"]["name"] == "fake/model"
+    assert body["scored"] == 7 and body["close_call_below"] == 0.7
+    assert body["close_calls"] == body["by_label"]["neutral"]["close"] + body["by_label"]["negative"]["close"]
+    assert len(body["sample"]) == 7 and all(abs(sum(p) - 1) < 0.01 for p in body["sample"])
+    mastodon = next(p for p in body["by_platform"] if p["platform"] == "mastodon")
+    assert sum(mastodon["bins"]) == mastodon["n"] == 3
+
+
+def test_posts_carry_word_highlights_once_explained(client, seeded):
+    clf = FakeClassifier()
+    model_id = register_model(seeded, clf.info)
+    while explain_batch(seeded, clf, model_id, 10, days=14):
+        pass
+    items = client.get("/api/v1/platforms/mastodon/posts").json()["items"]
+    by_text = {p["text"]: p["highlights"] for p in items}
+    assert by_text["nuclear power is good"] == [[17, 21, 1.0]]
+    assert by_text["nuclear plants exist"] is None  # 400 days old: never explained
+
+
+def test_series_by_month_and_week(client):
+    months = client.get("/api/v1/series").json()["platforms"]["mastodon"]
+    assert months[-1]["bucket"] == NOW.strftime("%Y-%m")
+    assert sum(m["positive"] + m["neutral"] + m["negative"] for m in months) == 3
+    weeks = client.get("/api/v1/series", params={"bucket": "week"}).json()["platforms"]["mastodon"]
+    assert len(weeks) == 26 and sum(w["positive"] + w["neutral"] + w["negative"] for w in weeks) == 2
+    assert client.get("/api/v1/series", params={"bucket": "day"}).status_code == 422

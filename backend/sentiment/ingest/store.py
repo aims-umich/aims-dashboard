@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 from sentiment.db import NEW_SEGMENTS_CHANNEL
 from sentiment.ingest.base import DocumentIn, PollResult
 from sentiment.text import RELEVANT, classify_relevance
+from sentiment.topics import topics_for
 
 UPSERT_DOCUMENT_SQL = """
     INSERT INTO documents (platform, external_id, kind, parent_id, url, author_handle, title, body,
@@ -35,8 +36,8 @@ UPSERT_DOCUMENT_SQL = """
 """
 
 INSERT_SEGMENT_SQL = """
-    INSERT INTO segments (document_id, ordinal, text, relevance, relevance_reason)
-    VALUES (%s, %s, %s, %s, %s)
+    INSERT INTO segments (document_id, ordinal, text, relevance, relevance_reason, topics)
+    VALUES (%s, %s, %s, %s, %s, %s)
     ON CONFLICT (document_id, ordinal) DO NOTHING
 """
 
@@ -98,7 +99,14 @@ async def save_documents(conn: AsyncConnection, documents: list[DocumentIn]) -> 
                 await cur.executemany(
                     INSERT_SEGMENT_SQL,
                     [
-                        (row["id"], i, seg.text, seg.relevance.status, seg.relevance.reason)
+                        (
+                            row["id"],
+                            i,
+                            seg.text,
+                            seg.relevance.status,
+                            seg.relevance.reason,
+                            topics_for(seg.text),
+                        )
                         for i, seg in enumerate(doc.segments)
                     ],
                 )
@@ -140,9 +148,9 @@ async def update_texts(conn: AsyncConnection, updates: list[tuple[str, str, str]
         relevance = classify_relevance(text, context_relevant=row["kind"] == "comment")
         segment = await (
             await conn.execute(
-                "UPDATE segments SET text = %s, relevance = %s, relevance_reason = %s"
+                "UPDATE segments SET text = %s, relevance = %s, relevance_reason = %s, topics = %s"
                 " WHERE document_id = %s AND ordinal = 0 RETURNING id",
-                (text, relevance.status, relevance.reason, row["id"]),
+                (text, relevance.status, relevance.reason, topics_for(text), row["id"]),
             )
         ).fetchone()
         if segment:

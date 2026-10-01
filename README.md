@@ -37,9 +37,9 @@ Posts are filtered before scoring: idioms ("the nuclear option"), weapons and ge
 ```
 
 - `backend/sentiment/ingest` - one isolated job per source, idempotent upserts, cursors in `ingest_state`.
-- `backend/sentiment/scorer` - claims unscored segments (`SKIP LOCKED`), wakes on `LISTEN/NOTIFY`, stores all three probabilities per model so a new model can score in shadow mode before it is switched on.
+- `backend/sentiment/scorer` - claims unscored segments (`SKIP LOCKED`), wakes on `LISTEN/NOTIFY`, stores all three probabilities per model so a new model can score in shadow mode before it is switched on. While the queue is empty it computes per-word explanations (integrated gradients) for recent posts.
 - `backend/sentiment/api` - read-only FastAPI with SQL aggregates, caching, and rate limiting.
-- `frontend` - React 19 + Vite + Tailwind + Recharts, one data-driven page per platform.
+- `frontend` - React 19 + Vite + Tailwind 4 with hand-built SVG charts: an overview, one data-driven page per platform, and Compare, Topics, Events, and Model pages.
 - `compose.yaml` - the whole backend on one machine (an Oracle Cloud Always Free VM in production), with Caddy for HTTPS.
 
 Setup and operations (Oracle VM, DNS, Vercel, keys, backups, monitoring) are in [deploy/README.md](deploy/README.md).
@@ -72,6 +72,7 @@ Other commands:
 
 - `sentiment import-legacy guardian mastodon nyt` - load the pre-2026 SQLite/CSV data (kept locally, never in git).
 - `sentiment relevance [--dry-run]` - re-apply the relevance rules after changing them.
+- `sentiment topics [--dry-run]` - re-apply the topic rules in `sentiment/topics.py` after changing them.
 - `sentiment backfill-nyt --from 2021-01 --to 2025-12 --replace-legacy` - rebuild NYT history from the Archive API.
 - `sentiment models list` / `sentiment models activate NAME [REVISION]` - choose which model the dashboard shows.
 

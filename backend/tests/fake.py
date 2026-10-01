@@ -10,6 +10,19 @@ class FakeClassifier:
         self.info = ModelInfo(name=name, revision=revision, backend="fake")
         self.calls: list[list[str]] = []
 
+    def explain(self, texts: list[str]) -> list[list[tuple[int, int, float]]]:
+        """'good' pushes toward positive, 'bad' toward negative."""
+        out = []
+        for text in texts:
+            lowered = text.lower()
+            spans = [
+                (lowered.index(w), lowered.index(w) + len(w), score)
+                for w, score in (("good", 1.0), ("bad", -1.0))
+                if w in lowered
+            ]
+            out.append(spans)
+        return out
+
     def predict(self, texts: list[str]) -> list[tuple[float, float, float]]:
         self.calls.append(list(texts))
         out = []

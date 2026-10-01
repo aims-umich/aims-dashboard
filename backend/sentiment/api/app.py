@@ -23,6 +23,7 @@ from sentiment.api import queries
 from sentiment.api.platforms import PLATFORMS, Platform, enabled_platforms
 from sentiment.config import Settings, get_settings
 from sentiment.ingest.sources import JOBS_BY_SOURCE
+from sentiment.topics import TOPICS_BY_ID
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ STALE_AFTER_INTERVALS = 3
 FAILING_AFTER = 3  # consecutive failed runs before a job counts as broken, however recent its last success
 # A job that has not run yet does not outweigh a healthy one; only stale or failing jobs do.
 SEVERITY = {"pending": 0, "ok": 1, "stale": 2, "error": 3}
-RangeParam = Annotated[str, Query(pattern="^(7d|30d|90d|1y|all)$")]
+RangeParam = Annotated[str, Query(pattern="^(24h|7d|30d|90d|1y|all)$")]
 # "us" keeps only items the source itself classifies as about the United States (Guardian tags).
 RegionParam = Annotated[str | None, Query(pattern="^(us)$")]
 
@@ -245,6 +246,59 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return {"range": range, "platforms": items}
 
         return cache.get_or_set(f"platforms:{range}", compute)
+
+    @app.get("/api/v1/strip")
+    def strip() -> dict[str, Any]:
+        def compute() -> dict[str, Any]:
+            with db() as conn:
+                return queries.strip(conn, enabled_platforms(settings))
+
+        return cache.get_or_set("strip", compute)
+
+    @app.get("/api/v1/topics")
+    def topics(range: RangeParam = "30d") -> dict[str, Any]:
+        def compute() -> dict[str, Any]:
+            with db() as conn:
+                return queries.topics(conn, enabled_platforms(settings), range)
+
+        return cache.get_or_set(f"topics:{range}", compute)
+
+    @app.get("/api/v1/topics/{topic_id}")
+    def topic(topic_id: str, range: RangeParam = "30d") -> dict[str, Any]:
+        if topic_id not in TOPICS_BY_ID:
+            raise HTTPException(404, f"Unknown topic: {topic_id}")
+
+        def compute() -> dict[str, Any]:
+            with db() as conn:
+                return queries.topic_detail(conn, enabled_platforms(settings), topic_id, range)
+
+        return cache.get_or_set(f"topic:{topic_id}:{range}", compute)
+
+    @app.get("/api/v1/series")
+    def series(bucket: Annotated[str, Query(pattern="^(month|week)$")] = "month") -> dict[str, Any]:
+        def compute() -> dict[str, Any]:
+            with db() as conn:
+                return queries.series(conn, enabled_platforms(settings), bucket)
+
+        return cache.get_or_set(f"series:{bucket}", compute)
+
+    @app.get("/api/v1/events")
+    def events(platform: Annotated[str, Query(max_length=32)] = "nyt") -> dict[str, Any]:
+        focus = platform_or_404(platform)
+
+        def compute() -> dict[str, Any]:
+            with db() as conn:
+                return queries.events(conn, enabled_platforms(settings), focus)
+
+        return cache.get_or_set(f"events:{platform}", compute)
+
+    @app.get("/api/v1/model")
+    def model() -> dict[str, Any]:
+        def compute() -> dict[str, Any]:
+            with db() as conn:
+                return queries.model_overview(conn, enabled_platforms(settings))
+
+        return cache.get_or_set("model", compute)
 
     @app.get("/api/v1/platforms/{key}/summary")
     def summary(key: str, range: RangeParam = "all", region: RegionParam = None) -> dict[str, Any]:

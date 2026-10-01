@@ -13,11 +13,24 @@ class ModelInfo:
     backend: str
 
 
+# [start, end, score]: a word's character span in the text and how hard it pushed the prediction,
+# from -1 (toward negative) to +1 (toward positive), relative to the text's strongest word.
+Span = tuple[int, int, float]
+
+
 class Classifier(Protocol):
     info: ModelInfo
 
     def predict(self, texts: list[str]) -> list[tuple[float, float, float]]:
         """Return (p_negative, p_neutral, p_positive) for each text, in order."""
+        ...
+
+
+class Explainer(Protocol):
+    """A classifier that can also say which words drove each prediction (optional)."""
+
+    def explain(self, texts: list[str]) -> list[list[Span]]:
+        """Return the most influential words of each text, strongest first."""
         ...
 
 

@@ -1,5 +1,9 @@
 import { BookOpen, Newspaper } from "lucide-react"
-import { SocialIcon } from "react-social-icons"
+// Import only the networks we show; the package entry point bundles every network's icon.
+import { SocialIcon } from "react-social-icons/component"
+import "react-social-icons/mastodon"
+import "react-social-icons/reddit"
+import "react-social-icons/youtube"
 
 // The Bluesky butterfly, drawn inline because the icon set predates it.
 function BlueskyMark({ size }) {
@@ -44,7 +48,7 @@ export default function PlatformIcon({ platform, size = 24 }) {
       )
     case "nyt":
       return (
-        <Glyph size={size} className="bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
+        <Glyph size={size} className="bg-neutral-900 text-white light:bg-neutral-900">
           <Newspaper size={size * 0.55} />
         </Glyph>
       )

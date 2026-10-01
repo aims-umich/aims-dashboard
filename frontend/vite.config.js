@@ -17,16 +17,4 @@ export default defineConfig({
       "/api": process.env.VITE_DEV_API_PROXY ?? "http://127.0.0.1:8000",
     },
   },
-  build: {
-    rollupOptions: {
-      output: {
-        // Keep the big chart and animation libraries in their own cacheable chunks.
-        manualChunks(id) {
-          if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) return "charts"
-          if (id.includes("node_modules/framer-motion") || id.includes("node_modules/motion-")) return "motion"
-          return undefined
-        },
-      },
-    },
-  },
 })

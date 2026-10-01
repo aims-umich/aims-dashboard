@@ -19,20 +19,22 @@ It began as a UROP Symposium demo (tagged `v0-local-demo`) and was rebuilt in Se
 
 - `backend/` - Python 3.12 package `sentiment` (CLI: `sentiment <command>`).
   - `ingest/` - collectors, one isolated job per feed (`sources/`: bluesky, mastodon, youtube, reddit, guardian, nyt), idempotent upserts, cursors in `ingest_state`.
-  - `scorer/` - loads one `Classifier` (`classifier/`), claims unscored segments with `SKIP LOCKED`, wakes on `LISTEN/NOTIFY new_segments`.
+  - `scorer/` - loads one `Classifier` (`classifier/`), claims unscored segments with `SKIP LOCKED`, wakes on `LISTEN/NOTIFY new_segments`. When the queue is empty it explains recent posts and comments (integrated gradients, `explanations` table).
   - `api/` - read-only FastAPI (`/api/v1/...`, `/healthz`).
-  - `text.py` - cleanup, sentence splitting, language checks, and the nuclear-energy relevance rules.
+  - `text.py` - cleanup, sentence splitting, language checks, and the nuclear-energy relevance rules (Guardian sentences are judged with their article's context).
+  - `topics.py` - keyword rules for the nine topics, stored per segment in `segments.topics`.
+  - `events.py` - the lab's fixed list of events for the Events page; spikes are detected in `api/queries.py`.
   - `importer/legacy.py` - one-time import of the old SQLite/CSV data.
   - `migrations/` - Alembic migrations (inside the package), written as raw SQL.
   - `tests/` - pytest against a real Postgres (`TEST_DATABASE_URL`).
-- `frontend/` - React 19 + Vite + Tailwind 4 + Recharts. `src/pages/PlatformPage.jsx` is one data-driven page for every platform, configured in `src/lib/platforms.js`. Playwright E2E is in `e2e/`.
+- `frontend/` - React 19 + Vite + Tailwind 4. Design tokens (both themes) are in `src/index.css`; charts are plain SVG and HTML in `src/components/charts/`. `src/pages/SourcePage.jsx` is one data-driven page for every platform, configured in `src/lib/platforms.js`; Compare, Topics, Events, and Model have their own pages. Playwright E2E is in `e2e/`.
 - `compose.yaml` - Postgres, migrate, ingest, scorer, api, and Caddy (profile `public`).
 - `deploy/` - VM bootstrap, deploy, backup, and restore scripts, the Caddyfile, `env.example`, and the operations runbook (`deploy/README.md`).
 - `.github/workflows/` - CI on pull requests; deploy on `main` (arm64 images to GHCR, then SSH to the VM).
 
 ## Data model
 
-`documents` (unique on `platform, external_id`) → `segments` (scorable spans with a `relevance` status and reason) → `predictions` (keyed by `segment_id, model_id`, with all three probabilities).
+`documents` (unique on `platform, external_id`) → `segments` (scorable spans with a `relevance` status and reason, and `topics`) → `predictions` (keyed by `segment_id, model_id`, with all three probabilities) and `explanations` (the words that pushed each prediction, as character spans).
 The dashboard shows only `relevance = 'relevant'` segments scored by the one `models.is_active` model.
 Canonical labels are `0 = negative, 1 = neutral, 2 = positive`, converted only at the classifier boundary.
 
@@ -53,6 +55,9 @@ Checks: `ruff check . && ruff format --check . && pytest` in `backend/`; `npm ru
 - Collected data never goes in git: it lives in Postgres and in encrypted backups. The old collector folders under `backend/` only hold untracked local legacy data.
 - Store only what is displayed or analyzed. Honor deletions: the Bluesky stream deletes and the Reddit compliance job both remove content deleted at the source.
 - After changing relevance rules in `text.py`, run `sentiment relevance` to re-apply them to stored segments, and add test cases for both the leak and the non-leak.
+- After changing topic rules in `topics.py`, run `sentiment topics`. Rules are plain keywords on purpose, so anyone can check why a text landed in a topic.
+- Green, gray, and red are reserved for positive, neutral, and negative; Cherenkov blue (`--glow`) is for live status and navigation only. Headlines name the chart; text only explains how to read it, never what to conclude.
+- Below 30 texts, show "too few to call" instead of a net sentiment, and hatch time before a source started collecting.
 - Secrets live only in `.env` (mode 600) on the VM and in GitHub environment secrets. Collector errors pass through `redact()` before they are stored or logged.
 - Every source is independent: a missing key marks that job "paused" and never blocks the others.
 - The API is read-only at the connection level (`default_transaction_read_only`), so do not add write endpoints to it.

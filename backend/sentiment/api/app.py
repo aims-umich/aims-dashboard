@@ -274,6 +274,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         return cache.get_or_set(f"topic:{topic_id}:{range}", compute)
 
+    @app.get("/api/v1/series")
+    def series(bucket: Annotated[str, Query(pattern="^(month|week)$")] = "month") -> dict[str, Any]:
+        def compute() -> dict[str, Any]:
+            with db() as conn:
+                return queries.series(conn, enabled_platforms(settings), bucket)
+
+        return cache.get_or_set(f"series:{bucket}", compute)
+
     @app.get("/api/v1/events")
     def events(platform: Annotated[str, Query(max_length=32)] = "nyt") -> dict[str, Any]:
         focus = platform_or_404(platform)

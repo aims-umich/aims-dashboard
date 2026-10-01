@@ -33,6 +33,9 @@ SCORED_FROM = """
 """
 
 
+# Confidence histogram bands. A top probability is never below 1/3; 0.7 is the close-call line.
+CONFIDENCE_EDGES = (1 / 3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+
 # The activity grid always covers the last four weeks, whatever range the page shows.
 ACTIVITY_WINDOW = timedelta(days=28)
 
@@ -121,21 +124,16 @@ def summary(
 
     histogram = conn.execute(
         f"""
-        SELECT width_bucket(p.confidence, 0.3333, 1.0000001, 7) AS bin, count(*) AS count
+        SELECT width_bucket(p.confidence, %(edges)s::real[]) AS bin, count(*) AS count
         {SCORED_FROM}
         GROUP BY 1 ORDER BY 1
         """,
-        params,
+        params | {"edges": list(CONFIDENCE_EDGES[1:-1])},
     ).fetchall()
     counts = {row["bin"]: row["count"] for row in histogram}
-    width = (1.0 - 1 / 3) / 7
     confidence_bins = [
-        {
-            "from": round(1 / 3 + i * width, 3),
-            "to": round(1 / 3 + (i + 1) * width, 3),
-            "count": counts.get(i + 1, 0),
-        }
-        for i in range(7)
+        {"from": CONFIDENCE_EDGES[i], "to": CONFIDENCE_EDGES[i + 1], "count": counts.get(i, 0)}
+        for i in range(len(CONFIDENCE_EDGES) - 1)
     ]
 
     engagement = _engagement(conn, platform, params) if platform.engagement else None
@@ -151,6 +149,7 @@ def summary(
             "scored": scored,
             "last_24h": totals["last_24h"],
             "first_published": totals["first_published"],
+            "collecting_since": collecting_since(conn, platform),
             "last_published": totals["last_published"],
             "avg_confidence": round(float(totals["avg_confidence"]), 4) if totals["avg_confidence"] else None,
         },
@@ -170,6 +169,15 @@ def summary(
         "engagement": engagement,
         "activity": activity,
     }
+
+
+def collecting_since(conn: psycopg.Connection, platform: Platform) -> datetime | None:
+    """The source's first document ever, so pages can mark time before collection began."""
+    return conn.execute(
+        "SELECT min(published_at) AS first FROM documents"
+        " WHERE platform = %(platform)s AND kind = ANY(%(kinds)s)",
+        {"platform": platform.key, "kinds": list(platform.scored_kinds)},
+    ).fetchone()["first"]
 
 
 def scored_count(conn: psycopg.Connection, platform: Platform) -> int:
@@ -248,11 +256,7 @@ def _activity(conn: psycopg.Connection, platform: Platform, us_only: bool) -> di
         """,
         params,
     ).fetchall()
-    first = conn.execute(
-        "SELECT min(published_at) AS first FROM documents"
-        " WHERE platform = %(platform)s AND kind = ANY(%(kinds)s)",
-        params,
-    ).fetchone()["first"]
+    first = collecting_since(conn, platform)
     counts = [[0] * 24 for _ in range(7)]
     for row in rows:
         counts[row["dow"]][row["hour"]] = row["n"]
@@ -471,11 +475,7 @@ def strip(
             """,
             params,
         ).fetchall()
-        first = conn.execute(
-            "SELECT min(published_at) AS first FROM documents"
-            " WHERE platform = %(platform)s AND kind = ANY(%(kinds)s)",
-            params,
-        ).fetchone()["first"]
+        first = collecting_since(conn, platform)
         items.append(
             {
                 "platform": platform.key,
@@ -733,6 +733,40 @@ def _month_range(first: str, last: str) -> list[str]:
     return months
 
 
+def weekly_counts(
+    conn: psycopg.Connection, platforms: list[Platform], weeks: int = 26
+) -> dict[str, dict[str, list[int]]]:
+    """{platform: {"YYYY-MM-DD" (Monday): [negative, neutral, positive]}} for the last `weeks` weeks."""
+    now = datetime.now(UTC)
+    start = date_trunc_week(now) - timedelta(weeks=weeks - 1)
+    params = {"scored": _scored_keys(platforms), "since": start, "until": now}
+    rows = conn.execute(
+        f"""
+        SELECT d.platform, date_trunc('week', d.published_at, 'UTC') AS week, p.label, count(*) AS n
+        {SCORED_ANY_FROM}
+        GROUP BY 1, 2, 3
+        """,
+        params,
+    ).fetchall()
+    keys = [(start + timedelta(weeks=i)).date().isoformat() for i in range(weeks)]
+    out = {p.key: {k: [0, 0, 0] for k in keys} for p in platforms}
+    for row in rows:
+        out[row["platform"]][row["week"].astimezone(UTC).date().isoformat()][row["label"]] = row["n"]
+    return out
+
+
+def series(conn: psycopg.Connection, platforms: list[Platform], bucket: str) -> dict[str, Any]:
+    """Sentiment counts per source by month (all time) or by week (last 26 weeks)."""
+    counts = monthly_counts(conn, platforms) if bucket == "month" else weekly_counts(conn, platforms)
+    return {
+        "bucket": bucket,
+        "platforms": {
+            key: [{"bucket": k, "negative": c[0], "neutral": c[1], "positive": c[2]} for k, c in rows.items()]
+            for key, rows in counts.items()
+        },
+    }
+
+
 def monthly_counts(conn: psycopg.Connection, platforms: list[Platform]) -> dict[str, dict[str, list[int]]]:
     """{platform: {"YYYY-MM": [negative, neutral, positive]}} over all time, every month from first data."""
     now = datetime.now(UTC)
@@ -809,7 +843,7 @@ def events(conn: psycopg.Connection, platforms: list[Platform], focus: Platform)
     }
 
 
-def spikes(counts: dict[str, dict[str, list[int]]], limit: int = 12) -> list[dict[str, Any]]:
+def spikes(counts: dict[str, dict[str, list[int]]], limit: int = 20) -> list[dict[str, Any]]:
     """Months where a source's volume or sentiment broke from its previous six months.
 
     Volume: at least SPIKE_RATIO times the recent monthly average. Sentiment: the month's 95% interval
@@ -876,6 +910,7 @@ def model_overview(conn: psycopg.Connection, platforms: list[Platform], sample: 
         "until": now,
         "close": CLOSE_CALL,
         "sample": sample,
+        "edges": list(CONFIDENCE_EDGES[1:-1]),
     }
     by_label = conn.execute(
         f"""
@@ -889,7 +924,7 @@ def model_overview(conn: psycopg.Connection, platforms: list[Platform], sample: 
         f"""
         SELECT d.platform, count(*) AS n, count(*) FILTER (WHERE p.confidence < %(close)s) AS close,
                avg(p.confidence) AS confidence,
-               array_agg(width_bucket(p.confidence, 0.3333, 1.0000001, 7)) AS bins
+               array_agg(width_bucket(p.confidence, %(edges)s::real[])) AS bins
         {SCORED_ANY_FROM} GROUP BY 1
         """,
         params,
@@ -916,6 +951,7 @@ def model_overview(conn: psycopg.Connection, platforms: list[Platform], sample: 
     return {
         "model": active_model(conn),
         "close_call_below": CLOSE_CALL,
+        "bin_edges": [round(e, 4) for e in CONFIDENCE_EDGES],
         "scored": total,
         "confidence": round(sum(float(r["confidence"]) * r["n"] for r in by_label) / total, 4)
         if total
@@ -928,7 +964,7 @@ def model_overview(conn: psycopg.Connection, platforms: list[Platform], sample: 
                 "n": platform_rows[p.key]["n"],
                 "close": platform_rows[p.key]["close"],
                 "confidence": round(float(platform_rows[p.key]["confidence"]), 4),
-                "bins": [platform_rows[p.key]["bins"].count(i + 1) for i in range(7)],
+                "bins": [platform_rows[p.key]["bins"].count(i) for i in range(len(CONFIDENCE_EDGES) - 1)],
             }
             for p in platforms
             if p.key in platform_rows

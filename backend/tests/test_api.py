@@ -353,3 +353,12 @@ def test_posts_carry_word_highlights_once_explained(client, seeded):
     by_text = {p["text"]: p["highlights"] for p in items}
     assert by_text["nuclear power is good"] == [[17, 21, 1.0]]
     assert by_text["nuclear plants exist"] is None  # 400 days old: never explained
+
+
+def test_series_by_month_and_week(client):
+    months = client.get("/api/v1/series").json()["platforms"]["mastodon"]
+    assert months[-1]["bucket"] == NOW.strftime("%Y-%m")
+    assert sum(m["positive"] + m["neutral"] + m["negative"] for m in months) == 3
+    weeks = client.get("/api/v1/series", params={"bucket": "week"}).json()["platforms"]["mastodon"]
+    assert len(weeks) == 26 and sum(w["positive"] + w["neutral"] + w["negative"] for w in weeks) == 2
+    assert client.get("/api/v1/series", params={"bucket": "day"}).status_code == 422

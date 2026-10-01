@@ -222,8 +222,10 @@ _GEOPOLITICS = re.compile(
 # Wider energy context that keeps a text about war or the military relevant. Not used to judge whether
 # a whole article is about energy, where a passing "renewables" says little.
 _ENERGY_CONTEXT = re.compile(
-    r"\b(?:electricity|renewables?|power\s+grid|energy\s+mix|radioactive\s+contamination|"
-    r"uranium\s+min(?:e|es|ing|ers)|data\s*cent(?:er|re)s?)\b",
+    r"\b(?:electricity|renewables?|power\s+grid|energy\s+mix|radioactive\s+(?:waste|contamination)|"
+    r"spent\s+fuel|uranium\s+min(?:e|es|ing|ers)|data\s*cent(?:er|re)s?|civil(?:ian)?\s+nuclear|"
+    # Plant names: amid a war, coverage of them is about plant safety.
+    r"chernobyl|chornobyl|fukushima|zaporizhzhia)\b",
     re.IGNORECASE,
 )
 # Likewise in texts about war and the military: a bare "nuclear" there means weapons or warships.
@@ -242,9 +244,10 @@ _ENERGY_ANCHORS = re.compile(
     r"|\bpower\s+(?:plants?|stations?)\b|\breactors?\b"
     # Hashtags such as #NuclearPowerPlants run words together.
     r"|\bnuclear(?:power|energy|fusion|reactor|plant|industry|waste)"
-    r"|\b(?:spent\s+fuel|radioactive\s+waste|atomic\s+energy|civil(?:ian)?\s+nuclear)\b"
-    # Plant names and disasters: coverage of them is about plant safety, even amid a war.
-    r"|\b(?:chernobyl|chornobyl|fukushima|zaporizhzhia|three\s+mile\s+island)\b"
+    # Not the International Atomic Energy Agency, Iran's Atomic Energy Organization, or the old US commission.
+    r"|\batomic\s+energy\b(?!\s+(?:agency|organi[sz]ation|commission))"
+    r"|\b(?:chernobyl|chornobyl|fukushima|zaporizhzhia)\s+(?:nuclear|plant|npp|reactors?|disaster|accident|"
+    r"meltdown|exclusion\s+zone)\b|\bthree\s+mile\s+island\b"
     r"|\b(?:nuclear\s+)?fusion\s+(?:energy|power|reactors?|plants?|research)\b|\bnuclear\s+fusion\b"
     r"|\bfission\b|\bsmall\s+modular\b|(?-i:\bSMRs?\b)",
     re.IGNORECASE,

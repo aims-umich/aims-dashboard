@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@vercel/analytics": "^2.0.1",
     "lucide-react": "^1.49.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

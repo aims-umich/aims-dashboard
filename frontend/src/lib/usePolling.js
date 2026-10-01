@@ -53,3 +53,33 @@ export function usePolling(path, intervalMs = 60_000) {
 
   return state
 }
+
+/** Like usePolling, for a list of paths fetched together; `data` is an array in the same order. */
+export function usePollingAll(paths, intervalMs = 120_000) {
+  const key = paths.join("\n")
+  const [state, setState] = useState({ key: null, data: null, error: null })
+
+  useEffect(() => {
+    if (!key) return undefined
+    const list = key.split("\n")
+    let cancelled = false
+    const controller = new AbortController()
+    const load = async () => {
+      try {
+        const data = await Promise.all(list.map((p) => getJson(p, { signal: controller.signal })))
+        if (!cancelled) setState({ key, data, error: null })
+      } catch (error) {
+        if (!cancelled && error.name !== "AbortError") setState((s) => ({ ...s, error }))
+      }
+    }
+    load()
+    const timer = setInterval(() => document.visibilityState === "visible" && load(), intervalMs)
+    return () => {
+      cancelled = true
+      controller.abort()
+      clearInterval(timer)
+    }
+  }, [key, intervalMs])
+
+  return state.key === key ? state : { data: null, error: state.error }
+}

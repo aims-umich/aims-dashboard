@@ -1,58 +1,44 @@
-import { useEffect, useState } from "react"
-import { FiMoon, FiSun } from "react-icons/fi"
+import { Suspense } from "react"
 import { Outlet } from "react-router-dom"
-import { Sidebar } from "./components/Sidebar"
+import Footer from "./components/layout/Footer"
+import Header from "./components/layout/Header"
+import MobileNav from "./components/layout/MobileNav"
+import { Skeleton } from "./components/ui/Panel"
+import { PLATFORM_ORDER, PLATFORMS } from "./lib/platforms"
 import { StatusProvider } from "./lib/status"
+import { useStatus } from "./lib/statusContext"
+import { useTheme } from "./lib/theme"
 
-function readDarkMode() {
-  try {
-    const saved = localStorage.getItem("darkMode")
-    if (saved != null) return JSON.parse(saved)
-  } catch {
-    // Storage can be unavailable (private mode); fall back to the system preference.
-  }
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true
+function Shell() {
+  const [theme, toggleTheme] = useTheme()
+  const { data } = useStatus()
+  const live = data?.platforms?.map((p) => p.platform)
+  const first = PLATFORM_ORDER.find((key) => !live || live.includes(key)) ?? "bluesky"
+  const sourcesHref = PLATFORMS[first].route
+  return (
+    <div className="flex min-h-screen flex-col">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-md bg-panel2 px-4 py-2 text-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Skip to content
+      </a>
+      <Header theme={theme} onToggleTheme={toggleTheme} sourcesHref={sourcesHref} />
+      <MobileNav theme={theme} onToggleTheme={toggleTheme} sourcesHref={sourcesHref} />
+      <main id="main" className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-24 sm:px-10">
+        <Suspense fallback={<Skeleton height={480} className="mt-14" />}>
+          <Outlet />
+        </Suspense>
+      </main>
+      <Footer />
+    </div>
+  )
 }
 
-const Layout = () => {
-  const [darkMode, setDarkMode] = useState(readDarkMode)
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", darkMode)
-    try {
-      localStorage.setItem("darkMode", JSON.stringify(darkMode))
-    } catch {
-      // Ignore: the preference just will not persist.
-    }
-  }, [darkMode])
-
-  const toggle = (
-    <button
-      type="button"
-      onClick={() => setDarkMode(!darkMode)}
-      className="rounded-lg bg-gray-200 p-2 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-      aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-    >
-      {darkMode ? <FiSun className="h-5 w-5" /> : <FiMoon className="h-5 w-5" />}
-    </button>
-  )
-
+export default function Layout() {
   return (
     <StatusProvider>
-      <Sidebar mobileActions={toggle}>
-        <div className="px-4 pb-12 pt-5 sm:px-6 md:pt-4 lg:px-8">
-          <div className="mb-2 hidden justify-end md:flex">{toggle}</div>
-          <main>
-            <Outlet />
-          </main>
-          <footer className="mx-auto mt-16 max-w-7xl border-t border-gray-200 pt-6 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
-            AIMS Lab, University of Michigan · Public posts and articles collected through each platform&apos;s official
-            API · Labels are model estimates
-          </footer>
-        </div>
-      </Sidebar>
+      <Shell />
     </StatusProvider>
   )
 }
-
-export default Layout

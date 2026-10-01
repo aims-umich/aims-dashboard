@@ -1,119 +1,124 @@
-import { motion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
+import { ArrowUpRight } from "lucide-react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
-import PlatformIcon from "../components/PlatformIcon"
-import FreshnessBadge from "../components/ui/FreshnessBadge"
-import { formatNumber, formatSigned } from "../lib/format"
-import { PLATFORMS, PLATFORM_ORDER } from "../lib/platforms"
-import { SENTIMENTS, SENTIMENT_COLORS } from "../lib/sentiment"
+import SignalStrips from "../components/charts/SignalStrips"
+import SourceScale from "../components/charts/SourceScale"
+import SourceCard from "../components/SourceCard"
+import { EmptyState, Skeleton } from "../components/ui/Panel"
+import SectionHeader from "../components/ui/Section"
+import Segmented from "../components/ui/Segmented"
+import { PAPER, PLATFORM_ORDER, PLATFORMS } from "../lib/platforms"
 import { useStatus } from "../lib/statusContext"
 import { useDocumentTitle } from "../lib/useDocumentTitle"
 import { usePolling } from "../lib/usePolling"
 
-function SentimentBar({ sentiment }) {
-  const total = SENTIMENTS.reduce((sum, s) => sum + (sentiment?.[s] ?? 0), 0)
-  if (!total) return <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700" />
-  return (
-    <div className="flex h-2 w-full overflow-hidden rounded-full" aria-hidden="true">
-      {SENTIMENTS.map((s) => (
-        <div key={s} style={{ width: `${(sentiment[s] / total) * 100}%`, background: SENTIMENT_COLORS[s] }} />
-      ))}
-    </div>
-  )
-}
+const SCALE_RANGES = [
+  { value: "30d", label: "30 days" },
+  { value: "1y", label: "1 year" },
+  { value: "all", label: "All time" },
+]
 
-function PlatformCard({ config, summary, status, index }) {
-  const scored = summary?.totals?.scored
+const byOrder = (rows) =>
+  [...rows].sort((a, b) => PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform))
+
+function Hero() {
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
-      <Link
-        to={config.route}
-        className="group flex h-full flex-col rounded-xl border border-gray-200/70 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-indigo-500 dark:border-gray-700/60 dark:bg-gray-800"
-      >
-        <div className={`-mx-5 -mt-5 mb-4 h-1.5 rounded-t-xl bg-gradient-to-r ${config.gradient}`} />
-        <div className="flex items-center gap-3">
-          <PlatformIcon platform={config.key} size={32} />
-          <div className="min-w-0">
-            <h2 className="font-semibold text-gray-900 dark:text-white">{config.name}</h2>
-            <p className="truncate text-xs text-gray-500 dark:text-gray-400">{config.tagline}</p>
-          </div>
-          <ArrowRight
-            size={18}
-            className="ml-auto text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-gray-900 dark:group-hover:text-white"
-            aria-hidden="true"
-          />
-        </div>
-        <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-xs text-gray-500 dark:text-gray-400">Scored {config.unitLabel}, 30 days</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
-              {summary ? formatNumber(scored) : "…"}
-            </dd>
-            {summary && (
-              <dd className="text-xs text-gray-500 dark:text-gray-400">
-                {formatNumber(summary.scored_all_time)} all time
-              </dd>
-            )}
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500 dark:text-gray-400">Net sentiment, 30 days</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
-              {summary ? formatSigned(summary.net_sentiment) : "…"}
-            </dd>
-          </div>
-        </dl>
-        <div className="mt-4">
-          <SentimentBar sentiment={summary?.sentiment} />
-        </div>
-        <div className="mt-auto pt-4">
-          <FreshnessBadge status={status} />
-        </div>
-      </Link>
-    </motion.div>
+    <section
+      aria-labelledby="hero-h"
+      className="flex flex-col gap-5 border-b border-line pt-14 pb-12 sm:pt-[72px] sm:pb-14"
+    >
+      <span className="num text-xs tracking-[0.1em] text-ink3">AIMS LAB · UNIVERSITY OF MICHIGAN</span>
+      <h1 id="hero-h" className="m-0 text-[40px] leading-none font-extrabold tracking-[-0.03em] wider sm:text-[64px]">
+        Nuclear Sentiment Analysis
+      </h1>
+      <p className="m-0 max-w-[680px] text-base leading-relaxed text-ink2 sm:text-lg">
+        Public sentiment toward nuclear energy across social media and news, scored live by a language model fine-tuned
+        on nuclear-energy discourse.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <a
+          href={PAPER.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-h-11 items-center gap-2.5 rounded-[10px] bg-ink px-5 text-[15px] font-semibold text-bg no-underline"
+        >
+          Read the paper
+          <ArrowUpRight size={15} aria-hidden="true" />
+        </a>
+        <Link
+          to="/about"
+          className="flex min-h-11 items-center rounded-[10px] border border-line2 px-5 text-[15px] font-medium text-ink no-underline"
+        >
+          How it works
+        </Link>
+      </div>
+      <p className="m-0 max-w-[680px] text-[13px] leading-normal text-ink3">
+        {PAPER.authors}. <span className="italic">{PAPER.title}.</span> {PAPER.venue}.
+      </p>
+    </section>
   )
 }
 
 export default function Home() {
   useDocumentTitle(null)
+  const [range, setRange] = useState("all")
   const { data: status } = useStatus()
-  const { data: overview } = usePolling("/platforms?range=30d")
-  const enabled = new Set((status?.platforms ?? overview?.platforms ?? []).map((p) => p.platform))
-  const keys = PLATFORM_ORDER.filter((key) => enabled.has(key))
-  const summaries = Object.fromEntries((overview?.platforms ?? []).map((p) => [p.platform, p]))
+  const scale = usePolling(`/platforms?range=${range}`)
+  const month = usePolling("/platforms?range=30d")
+  const strip = usePolling("/strip")
   const statuses = Object.fromEntries((status?.platforms ?? []).map((p) => [p.platform, p]))
+  const unitOf = (row) => PLATFORMS[row.platform]?.unitLabel ?? "texts"
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <header className="max-w-3xl">
-        <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
-          AIMS Lab · University of Michigan
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-          Public sentiment toward nuclear energy, live
-        </h1>
-        <p className="mt-4 text-base leading-7 text-gray-600 dark:text-gray-300">
-          We collect public posts, comments, and news coverage about nuclear energy as they are published, and a
-          sentiment model fine-tuned on nuclear-energy discourse labels each one as positive, neutral, or negative.{" "}
-          <Link to="/about" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-            How it works
-          </Link>
-        </p>
-      </header>
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {keys.length
-          ? keys.map((key, i) => (
-              <PlatformCard
-                key={key}
-                index={i}
-                config={PLATFORMS[key]}
-                summary={summaries[key]}
-                status={statuses[key]}
-              />
-            ))
-          : Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="h-[228px] animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
-            ))}
-      </div>
-    </div>
+    <>
+      <Hero />
+
+      <section aria-labelledby="scale-h" className="flex flex-col gap-6 border-b border-line py-14">
+        <SectionHeader
+          id="scale-h"
+          code="CH-01"
+          title="Where each source stands"
+          caption="Net sentiment with its 95% interval. A dot is gray when its interval crosses zero, meaning we cannot yet tell that source apart from neutral."
+          actions={<Segmented label="Time range" value={range} onChange={setRange} options={SCALE_RANGES} />}
+        />
+        {scale.data ? (
+          <SourceScale platforms={byOrder(scale.data.platforms)} unitOf={unitOf} />
+        ) : scale.error ? (
+          <EmptyState>Could not load the sources. Retrying every minute.</EmptyState>
+        ) : (
+          <Skeleton height={380} />
+        )}
+      </section>
+
+      <section aria-labelledby="strip-h" className="flex flex-col gap-6 border-b border-line py-14">
+        <SectionHeader
+          id="strip-h"
+          code="CH-02"
+          title="Last 24 hours"
+          caption="One tick per scored post, comment or sentence, placed at the moment it was published."
+        />
+        {strip.data ? (
+          <SignalStrips data={{ ...strip.data, platforms: byOrder(strip.data.platforms) }} />
+        ) : (
+          <Skeleton height={320} />
+        )}
+      </section>
+
+      <section aria-labelledby="src-h" className="flex flex-col gap-6 pt-14">
+        <SectionHeader
+          id="src-h"
+          code="CH-03"
+          title="Last 30 days"
+          actions={<span className="text-[13px] text-ink3">Bars show monthly volume over the past 13 months.</span>}
+        />
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-4">
+          {month.data
+            ? byOrder(month.data.platforms).map((p) => (
+                <SourceCard key={p.platform} summary={p} status={statuses[p.platform]} />
+              ))
+            : Array.from({ length: 5 }, (_, i) => <Skeleton key={i} height={300} />)}
+        </div>
+      </section>
+    </>
   )
 }

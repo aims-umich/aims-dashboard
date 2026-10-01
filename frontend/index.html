@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -8,16 +8,27 @@
       name="description"
       content="Live public sentiment toward nuclear energy across Bluesky, Mastodon, YouTube, and the news, from the AIMS Lab at the University of Michigan."
     />
-    <meta name="theme-color" content="#111827" />
-    <title>Nuclear Energy Sentiment · AIMS Lab</title>
+    <meta name="theme-color" content="#080C11" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <title>Nuclear Sentiment Analysis · AIMS Lab</title>
     <script>
-      // Apply the saved theme before first paint to avoid a light flash in dark mode.
+      // Apply the saved theme before first paint so there is no flash of the wrong one.
       try {
-        const saved = localStorage.getItem("darkMode")
-        const dark = saved != null ? JSON.parse(saved) : matchMedia("(prefers-color-scheme: dark)").matches
-        if (dark) document.documentElement.classList.add("dark")
+        const saved = localStorage.getItem("theme")
+        const theme =
+          saved === "light" || saved === "dark"
+            ? saved
+            : matchMedia("(prefers-color-scheme: light)").matches
+              ? "light"
+              : "dark"
+        document.documentElement.dataset.theme = theme
       } catch {
-        document.documentElement.classList.add("dark")
+        document.documentElement.dataset.theme = "dark"
       }
     </script>
   </head>

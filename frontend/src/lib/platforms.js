@@ -2,92 +2,97 @@
 export const PLATFORMS = {
   bluesky: {
     key: "bluesky",
-    defaultRange: "7d",
+    group: "social",
     name: "Bluesky",
+    short: "BSKY",
     route: "/bluesky",
-    tagline: "Decentralized social network",
+    defaultRange: "7d",
     description:
       "Every public Bluesky post is read from the Jetstream firehose as it is published and filtered for nuclear-energy discussion.",
-    cadence: "Real time (seconds)",
-    gradient: "from-sky-500 to-blue-600",
-    accent: "#1185FE",
+    cadence: "Real time",
     unitLabel: "posts",
+    unitSingular: "post",
+    viewLabel: "View on Bluesky",
   },
   mastodon: {
     key: "mastodon",
-    defaultRange: "30d",
+    group: "social",
     name: "Mastodon",
+    short: "MAST",
     route: "/mastodon",
-    tagline: "Decentralized social network",
-    description:
-      "Public posts from nuclear-energy hashtag timelines on Mastodon, checked every two minutes.",
+    defaultRange: "30d",
+    description: "Public posts from nuclear-energy hashtag timelines on Mastodon, checked every two minutes.",
     cadence: "Every 2 minutes",
-    gradient: "from-indigo-500 to-violet-600",
-    accent: "#6364FF",
     credit: "Andre Gala-Garza",
     unitLabel: "posts",
+    unitSingular: "post",
+    viewLabel: "View on Mastodon",
   },
   reddit: {
     key: "reddit",
-    defaultRange: "30d",
+    group: "social",
     name: "Reddit",
+    short: "RDDT",
     route: "/reddit",
-    tagline: "Social news and forums",
+    defaultRange: "30d",
     description: "New posts from Reddit search and nuclear-energy subreddits through Reddit's official API.",
     cadence: "Every 2 minutes",
-    gradient: "from-orange-500 to-red-500",
-    accent: "#FF4500",
     unitLabel: "posts",
+    unitSingular: "post",
+    viewLabel: "View on Reddit",
   },
   youtube: {
     key: "youtube",
-    defaultRange: "all",
+    group: "social",
     name: "YouTube",
+    short: "YT",
     route: "/youtube",
-    tagline: "Online video sharing",
+    defaultRange: "30d",
     description:
       "Comments on newly published nuclear-energy videos. New videos are found every 30 minutes and their comment threads are followed for two weeks.",
     cadence: "Every 30 minutes",
-    gradient: "from-red-500 to-rose-600",
-    accent: "#FF0000",
     credit: "Arvind Kutirakulam",
     unitLabel: "comments",
+    unitSingular: "comment",
+    viewLabel: "View on YouTube",
   },
   guardian: {
     key: "guardian",
-    defaultRange: "all",
+    group: "news",
     name: "The Guardian",
+    short: "GUARD",
     route: "/guardian",
-    tagline: "British daily newspaper",
+    defaultRange: "all",
     description:
       "Articles about nuclear power from every section of The Guardian's Content API. Each sentence that mentions nuclear energy is scored on its own; articles the Guardian tags as U.S. coverage can be shown on their own.",
     regionFilter: true,
     cadence: "Every 30 minutes",
-    gradient: "from-emerald-500 to-teal-600",
-    accent: "#052962",
-    chartColor: "#4B7BC8",
     attribution: { text: "Powered by the Guardian", href: "https://open-platform.theguardian.com/" },
-    logo: { light: "/guardian/The-Guardian-logo.png", dark: "/guardian/The-Guardian-logo-white.png" },
     unitLabel: "sentences",
+    unitSingular: "sentence",
+    articles: true,
   },
   nyt: {
     key: "nyt",
-    defaultRange: "all",
+    group: "news",
     name: "New York Times",
+    short: "NYT",
     route: "/nyt",
-    tagline: "Daily newspaper based in New York City",
+    defaultRange: "all",
     description:
       "Articles about nuclear power from the New York Times Article Search API, scored on their abstract and lead paragraph.",
     cadence: "Every hour",
-    gradient: "from-slate-600 to-slate-800",
-    accent: "#121212",
-    chartColor: "#9CA3AF",
     attribution: { text: "Data provided by The New York Times", href: "https://developer.nytimes.com/" },
     unitLabel: "articles",
+    unitSingular: "article",
+    articles: true,
   },
 }
 
+export const PLATFORM_ORDER = ["bluesky", "mastodon", "reddit", "youtube", "guardian", "nyt"]
+
 export const RANGES = [
+  { value: "24h", label: "24 hours" },
   { value: "7d", label: "7 days" },
   { value: "30d", label: "30 days" },
   { value: "90d", label: "90 days" },
@@ -95,4 +100,13 @@ export const RANGES = [
   { value: "all", label: "All" },
 ]
 
-export const PLATFORM_ORDER = ["bluesky", "mastodon", "reddit", "youtube", "guardian", "nyt"]
+export const PAPER = {
+  href: "https://www.sciencedirect.com/science/article/pii/S136403212400296X?via%3Dihub",
+  authors: "Kwon, Vu, Bhargava, Radaideh, Cooper, Joynt and Radaideh",
+  title:
+    "Sentiment analysis of the United States public support of nuclear power on social media using large language models",
+  venue: "Renewable and Sustainable Energy Reviews 200 (2024)",
+}
+
+// What the lab measured for each model it has deployed (held-out test set).
+export const MODEL_ACCURACY = { "kumo24/bert-sentiment-nuclear": 0.979 }

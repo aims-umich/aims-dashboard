@@ -166,11 +166,18 @@ _EXCLUSIONS: list[tuple[str, re.Pattern[str]]] = [
     (
         "weapons",
         re.compile(
-            r"\b(?:non-?)?nuclear[-\s]+(?:weapons?|bombs?|war(?:fare|s)?|warheads?|missiles?|arsenals?|"
-            r"strikes?|attacks?|submarines?|deterren(?:ce|t)s?|tests?|testing|threats?|"
-            r"(?:non-?)?proliferation|disarmament|armed|capable|blackmail|escalation|"
-            r"annihilation|apocalypse|armageddon|triad|umbrella|posture|doctrine|rhetoric|saber-?rattling|"
-            r"sabre-?rattling|forces|powers|states?|club)\b"
+            r"\b(?:non-?)?nuclear[-\s]+(?:weapons?|weopons?|bombs?|bombings?|war(?:fare|s)?|warheads?|"
+            r"missiles?|arsenals?|arms|strikes?|attacks?|submarines?|subs?|deterren(?:ce|t)s?|tests?|testing|"
+            r"threats?|(?:non-?)?proliferation|disarmament|armed|capable|capabilit(?:y|ies)|tipped|"
+            r"explosi(?:ve|ves|on|ons)|blasts?(?!\s+records)|detonations?|launch(?:es)?|command|stockpiles?|exchanges?|"
+            r"bunkers?|superpowers?|thresholds?|brinkmanship|strength|moderni[sz]ation|shadow|"
+            r"warnings?|shield|protection|blackmail|escalation|annihilation|apocalypse|armageddon|triad|"
+            r"umbrella|posture|doctrine|rhetoric|saber-?rattling|sabre-?rattling|forces|powers|states?|club)\b"
+            r"|\bnuclear[-\s]+powered\s+(?:submarines?|subs?|warships?|carriers?|aircraft\s+carriers?|"
+            r"frigates?|destroyers?|cruisers?|navy|fleet)\b"
+            # Chemical, biological, radiological and nuclear defence (CBRN, CBRNE).
+            r"|\bnuclear\s+(?:or|and|&)\s+(?:biological|radiological)\b"
+            r"|\b(?:biological|radiological)\s*,?\s+(?:and\s+|or\s+)?nuclear\b"
             r"|\bnukes?\b(?!\s+plants?)"
             r"|\bnuclear\s+(?:program(?:me)?s?|deal|talks|negotiations|ambitions|sites?|facilities|"
             r"enrichment)\b(?=[^.]*\b(?:iran|tehran|north\s+korea|pyongyang|kim\s+jong)\b)"
@@ -187,6 +194,22 @@ _EXCLUSIONS: list[tuple[str, re.Pattern[str]]] = [
             re.IGNORECASE,
         ),
     ),
+    (
+        # "Reactor" also names a magazine, YouTubers who react to videos, Iron Man's power source,
+        # game items, and chemical vessels.
+        "other_reactor",
+        re.compile(
+            r"\breactor\s*mag(?:azine)?\b|\breactormag\.com\S*"
+            r"|\b(?:youtube|tiktok|twitch|online|video)\s+[\"“]?reactors?\b|\breactors?\s+(?:videos?|channels?)\b"
+            r"|\b(?:reaction|reacting|reacts|reacted)\s+(?:to|videos?|channels?)\b[^.!?]*\breactors?\b"
+            r"|\b(?:arc|mako|mekanism|hack|juno)\s+reactors?\b"
+            r"|\b(?:chemical|catalytic|ceramic|membrane|packed-bed|enzyme|immobili[sz]ed-enzyme|biodiesel|"
+            r"biogas|bio|stirred|tubular|fluidi[sz]ed|electrochemical|photochemical)\s+(?:[\w-]+\s+){0,2}"
+            r"reactors?\b"
+            r"|\b(?:refiner(?:y|ies)|pipework|catalysts?)\b[^.!?]*\breactors?\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 # In texts about these actors, a bare "nuclear" almost always means weapons or diplomacy;
@@ -196,10 +219,32 @@ _GEOPOLITICS = re.compile(
     r"russia|russian|kremlin|putin|moscow|nato|pentagon|israel|israeli|china|chinese|pakistan|india)\b",
     re.IGNORECASE,
 )
-# Energy-specific terms that keep a geopolitical text relevant (such as Zaporizhzhia or Bushehr coverage).
+# Wider energy context that keeps a text about war or the military relevant. Not used to judge whether
+# a whole article is about energy, where a passing "renewables" says little.
+_ENERGY_CONTEXT = re.compile(
+    r"\b(?:electricity|renewables?|power\s+grid|energy\s+mix|radioactive\s+contamination|"
+    r"uranium\s+min(?:e|es|ing|ers)|data\s*cent(?:er|re)s?)\b",
+    re.IGNORECASE,
+)
+# Likewise in texts about war and the military: a bare "nuclear" there means weapons or warships.
+_MILITARY = re.compile(
+    r"\b(?:(?<!cold\s)(?<!cold-)wars?|warfare|wartime|military|militaries|army|armies|navy|naval|troops|soldiers?|missiles?|"
+    r"bombs?|bombed|bombing|bombers?|warheads?|weapons?|weopons?|arsenals?|deterren(?:ce|t)|pentagon|"
+    r"hegseth|stratcom|nnsa|submarines?|aukus|trident|icbms?|airstrikes?|invasion|battlefield|ceasefire|"
+    r"armageddon|doomsday|cbrne?)\b",
+    re.IGNORECASE,
+)
+# Energy-specific terms that keep a geopolitical or military text relevant
+# (such as Zaporizhzhia or Bushehr coverage).
 _ENERGY_ANCHORS = re.compile(
-    r"\bnuclear[-\s]+(?:power|energy|electricity|plants?|reactors?|stations?|industry|generation|fuel)\b"
-    r"|\bpower\s+(?:plants?|stations?)\b|\breactors?\b|\bnuclear(?:power|energy|fusion)\b"
+    r"\bnuclear[-\s]+(?:power|energy|electricity|plants?|reactors?|stations?|industry|generation|fuel|"
+    r"waste)\b"
+    r"|\bpower\s+(?:plants?|stations?)\b|\breactors?\b"
+    # Hashtags such as #NuclearPowerPlants run words together.
+    r"|\bnuclear(?:power|energy|fusion|reactor|plant|industry|waste)"
+    r"|\b(?:spent\s+fuel|radioactive\s+waste|atomic\s+energy|civil(?:ian)?\s+nuclear)\b"
+    # Plant names and disasters: coverage of them is about plant safety, even amid a war.
+    r"|\b(?:chernobyl|chornobyl|fukushima|zaporizhzhia|three\s+mile\s+island)\b"
     r"|\b(?:nuclear\s+)?fusion\s+(?:energy|power|reactors?|plants?|research)\b|\bnuclear\s+fusion\b"
     r"|\bfission\b|\bsmall\s+modular\b|(?-i:\bSMRs?\b)",
     re.IGNORECASE,
@@ -283,6 +328,10 @@ def classify_relevance(
     geopolitical = bool(_GEOPOLITICS.search(remaining)) or (article is not None and article.geopolitical)
     if geopolitical and not _ENERGY_ANCHORS.search(remaining):
         return Relevance(EXCLUDED, "+".join([*reasons, "geopolitics"]))
+    # A text that already names weapons, or talks about war, uses any leftover bare "nuclear" the same way.
+    military = "weapons" in reasons or _MILITARY.search(remaining)
+    if military and not (_ENERGY_ANCHORS.search(remaining) or _ENERGY_CONTEXT.search(remaining)):
+        return Relevance(EXCLUDED, "+".join(reasons if "weapons" in reasons else [*reasons, "weapons"]))
     if has_anchor(remaining):
         return Relevance(RELEVANT)
     return Relevance(EXCLUDED, "+".join(reasons) or "no_keyword")

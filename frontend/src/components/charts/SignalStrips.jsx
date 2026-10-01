@@ -33,40 +33,42 @@ function Strip({ row, since, until, unit }) {
     bin = { from, to, counts }
   }
   return (
-    <div ref={ref} className="relative h-11 overflow-hidden rounded-md bg-panel2" {...handlers}>
-      {gap > 0 && <div className="hatch absolute inset-y-0 left-0" style={{ width: `${gap * 100}%` }} />}
-      <svg
-        viewBox="0 0 1000 40"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0.5 h-10 w-full"
-      >
-        {[1, 0, 2].map((label) => (
-          <g key={label}>
-            <path
-              d={paths[label][1]}
-              stroke={COLORS[label]}
-              strokeOpacity="0.4"
-              strokeWidth="1.3"
-              vectorEffect="non-scaling-stroke"
-            />
-            <path d={paths[label][0]} stroke={COLORS[label]} strokeWidth="1.3" vectorEffect="non-scaling-stroke" />
-          </g>
-        ))}
-      </svg>
-      {row.count === 0 && (
-        <span className="absolute inset-0 flex items-center px-4 text-[13px] text-ink3">
-          No new {unit} in the last 24 hours
-        </span>
-      )}
-      {hover && (
-        <div
-          className="pointer-events-none absolute inset-y-0 bg-ink/10"
-          style={{ left: `${(hover.index / BINS) * 100}%`, width: `${100 / BINS}%` }}
-        />
-      )}
+    <div ref={ref} className="relative h-11" {...handlers}>
+      <div className="absolute inset-0 overflow-hidden rounded-md bg-panel2">
+        {gap > 0 && <div className="hatch absolute inset-y-0 left-0" style={{ width: `${gap * 100}%` }} />}
+        <svg
+          viewBox="0 0 1000 40"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0.5 h-10 w-full"
+        >
+          {[1, 0, 2].map((label) => (
+            <g key={label}>
+              <path
+                d={paths[label][1]}
+                stroke={COLORS[label]}
+                strokeOpacity="0.4"
+                strokeWidth="1.3"
+                vectorEffect="non-scaling-stroke"
+              />
+              <path d={paths[label][0]} stroke={COLORS[label]} strokeWidth="1.3" vectorEffect="non-scaling-stroke" />
+            </g>
+          ))}
+        </svg>
+        {row.count === 0 && (
+          <span className="absolute inset-0 flex items-center px-4 text-[13px] text-ink3">
+            No new {unit} in the last 24 hours
+          </span>
+        )}
+        {hover && (
+          <div
+            className="pointer-events-none absolute inset-y-0 bg-ink/10"
+            style={{ left: `${(hover.index / BINS) * 100}%`, width: `${100 / BINS}%` }}
+          />
+        )}
+      </div>
       {bin && (
-        <Tooltip x={hover.x} y={0} containerWidth={hover.width} width={200}>
+        <Tooltip x={hover.x} y={50} containerWidth={hover.width} width={200}>
           <span className="font-semibold">
             {hhmm(bin.from)} to {hhmm(bin.to)} UTC
           </span>
